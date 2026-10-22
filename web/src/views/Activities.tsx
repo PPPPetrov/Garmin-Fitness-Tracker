@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApi, type Activity, type RideType } from '../api';
 import { DASH, duration, km, num, rideName, typeName, watts } from '../format';
+import { Card } from '../ui';
 
 interface Page {
   total: number;
@@ -21,11 +22,27 @@ function unusableLoad(a: Activity): string | null {
   return null;
 }
 
-/** The screen's question: find the ride I am thinking of. */
-export function Activities() {
+/**
+ * The screen's question: find the ride I am thinking of. The search lives in the top bar,
+ * so it is the same field on every screen; on a phone, where the top bar has no room for
+ * it, it sits on the card instead.
+ */
+export function Activities({
+  search,
+  onSearch,
+}: {
+  search: string;
+  onSearch: (term: string) => void;
+}) {
   const [type, setType] = useState('');
-  const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
+  const [lastSearch, setLastSearch] = useState(search);
+
+  /* A new search starts again from the first page. */
+  if (search !== lastSearch) {
+    setLastSearch(search);
+    setOffset(0);
+  }
 
   const query = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
   if (type) query.set('type', type);
@@ -33,11 +50,6 @@ export function Activities() {
 
   const page = useApi<Page>(`/api/activities?${query}`, [type, search, offset]);
   const types = useApi<{ rows: RideType[] }>('/api/types');
-
-  const change = (next: () => void) => {
-    setOffset(0);
-    next();
-  };
 
   const total = page.state === 'ready' ? page.data.total : null;
   const filtered = Boolean(type || search);
@@ -47,60 +59,94 @@ export function Activities() {
       <div className="title-row">
         <div className="title-block">
           <h1>Activities</h1>
-          <p className="finding">
-            Every ride imported from Garmin, newest first. A dash means the sensor was not
-            there, never a zero.
+          <p className="subtitle">
+            Every ride imported from Garmin, newest first. A dash means the sensor was not there,
+            never a zero.
           </p>
+        </div>
+        <div className="title-actions toolbar">
+          <input
+            className="field phone-only"
+            type="search"
+            placeholder="Search name or place"
+            value={search}
+            aria-label="Search rides by name or place"
+            onChange={(e) => onSearch(e.target.value)}
+          />
+          <select
+            className="field"
+            value={type}
+            aria-label="Ride type"
+            onChange={(e) => {
+              setOffset(0);
+              setType(e.target.value);
+            }}
+          >
+            <option value="">All types</option>
+            {types.state === 'ready' &&
+              types.data.rows.map((t) => (
+                <option key={t.activity_type} value={t.activity_type}>
+                  {typeName(t.activity_type)} ({t.n})
+                </option>
+              ))}
+          </select>
         </div>
       </div>
 
-      <div className="filters">
-        <select
-          className="field"
-          value={type}
-          aria-label="Activity type"
-          onChange={(e) => change(() => setType(e.target.value))}
-        >
-          <option value="">All types</option>
-          {types.state === 'ready' &&
-            types.data.rows.map((t) => (
-              <option key={t.activity_type} value={t.activity_type}>
-                {typeName(t.activity_type)} ({t.n})
-              </option>
-            ))}
-        </select>
-        <input
-          className="field"
-          type="search"
-          placeholder="Search name or place"
-          value={search}
-          aria-label="Search rides"
-          onChange={(e) => change(() => setSearch(e.target.value))}
-        />
-        <span className="sub">
-          {total == null ? (
+      <Card
+        title={filtered ? 'Matching rides' : 'All rides'}
+        aside={
+          total == null ? (
             'Counting…'
           ) : (
-            <>
+            <span>
               <span className="fig">{num(total)}</span> ride{total === 1 ? '' : 's'}
-              {filtered ? ' match these filters' : ''}
-            </>
-          )}
-        </span>
-      </div>
+              {search ? <> matching “{search}”</> : ''}
+            </span>
+          )
+        }
+        flush
+        foot={
+          page.state === 'ready' && page.data.total > 0 ? (
+            <div className="pager">
+              <span className="sub fig">
+                {offset + 1}–{Math.min(offset + PAGE, page.data.total)} of {num(page.data.total)}
+              </span>
+              <div className="pager-buttons">
+                <button
+                  className="btn-quiet"
+                  type="button"
+                  disabled={offset === 0}
+                  onClick={() => setOffset(Math.max(0, offset - PAGE))}
+                >
+                  Previous
+                </button>
+                <button
+                  className="btn-quiet"
+                  type="button"
+                  disabled={offset + PAGE >= page.data.total}
+                  onClick={() => setOffset(offset + PAGE)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : undefined
+        }
+      >
+        {page.state === 'error' && (
+          <p className="state state-error" style={{ margin: 16 }}>
+            Could not load the rides: {page.message}
+          </p>
+        )}
 
-      {page.state === 'error' && (
-        <p className="state state-error">Could not load the rides: {page.message}</p>
-      )}
+        {page.state === 'ready' && page.data.total === 0 && (
+          <p className="state" style={{ margin: 16 }}>
+            No rides match these filters. Clear the search or choose another type.
+          </p>
+        )}
 
-      {page.state === 'ready' && page.data.total === 0 && (
-        <p className="state">
-          No rides match these filters. Clear the search or choose another type.
-        </p>
-      )}
-
-      {(page.state === 'loading' || (page.state === 'ready' && page.data.total > 0)) && (
-        <>
+        {(page.state === 'loading' || (page.state === 'ready' && page.data.total > 0)) && (
           <div className="table-scroll">
             <table>
               <thead>
@@ -134,37 +180,39 @@ export function Activities() {
                     const flag = unusableLoad(a);
                     return (
                       <tr key={a.activity_id}>
-                        <td className="fig">{a.local_date}</td>
+                        <td className="date fig">{a.local_date}</td>
                         <td className="name">
-                          <div className="row-name">{rideName(a.activity_name, DASH)}</div>
+                          <div className="cell-name">{rideName(a.activity_name, DASH)}</div>
                           {(a.location_name || flag) && (
                             <div className="sub">
                               {[a.location_name, flag].filter(Boolean).join(' · ')}
                             </div>
                           )}
                         </td>
-                        <td>{typeName(a.activity_type)}</td>
-                        <td className="num fig">{duration(a.duration_s)}</td>
-                        <td className="num fig">{km(a.distance_m)}</td>
-                        <td className="num fig">
+                        <td>
+                          <span className="pill">{typeName(a.activity_type)}</span>
+                        </td>
+                        <td className="num">{duration(a.duration_s)}</td>
+                        <td className="num">{km(a.distance_m)}</td>
+                        <td className="num">
                           <Cell value={a.elevation_gain_m} />
                         </td>
-                        <td className="num fig">
+                        <td className="num">
                           <Cell value={a.avg_power} format={watts} />
                         </td>
-                        <td className="num fig">
+                        <td className="num">
                           <Cell value={a.normalized_power} format={watts} />
                         </td>
-                        <td className="num fig">
+                        <td className="num">
                           <Cell value={a.ftp_at_ride} format={watts} />
                         </td>
-                        <td className="num fig">
+                        <td className="num">
                           <Cell value={a.training_stress_score} format={(v) => num(v, 0)} />
                         </td>
-                        <td className="num fig">
+                        <td className="num" style={{ fontWeight: 600 }}>
                           <Cell value={a.activity_training_load} format={(v) => num(v, 0)} />
                         </td>
-                        <td className="num fig">
+                        <td className="num">
                           <Cell value={a.avg_hr} />
                         </td>
                       </tr>
@@ -173,32 +221,8 @@ export function Activities() {
               </tbody>
             </table>
           </div>
-
-          {page.state === 'ready' && (
-            <div className="filters" style={{ marginTop: 16, marginBottom: 0 }}>
-              <button
-                className="btn-quiet"
-                type="button"
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE))}
-              >
-                Previous
-              </button>
-              <button
-                className="btn-quiet"
-                type="button"
-                disabled={offset + PAGE >= page.data.total}
-                onClick={() => setOffset(offset + PAGE)}
-              >
-                Next
-              </button>
-              <span className="sub fig">
-                {offset + 1}–{Math.min(offset + PAGE, page.data.total)} of {num(page.data.total)}
-              </span>
-            </div>
-          )}
-        </>
-      )}
+        )}
+      </Card>
     </>
   );
 }

@@ -1,20 +1,7 @@
 /** A missing value is a grey dash at label size, never a zero and never "--". */
 export const DASH = '–';
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function num(value: number | null | undefined, decimals = 0): string {
   if (value == null || !Number.isFinite(value)) return DASH;
@@ -97,10 +84,38 @@ export function longDate(iso: string): string {
   return `${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
 }
 
-/** "Oct 26" — for an axis that spans years. */
-export function monthYear(iso: string): string {
+/** "Oct 26" — for an axis that spans years; "Oct 2026" where there is room. */
+export function monthYear(iso: string, fullYear = false): string {
   const [year, month] = iso.split('-');
-  return `${MONTHS[Number(month) - 1]} ${year?.slice(2)}`;
+  return `${MONTHS[Number(month) - 1]} ${fullYear ? year : year?.slice(2)}`;
+}
+
+/** "Mon 19 Oct" — a single day in a tooltip, where the weekday is the point. */
+export function dayDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const weekday = WEEKDAYS[(new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay() + 6) % 7];
+  return `${weekday} ${day} ${MONTHS[month! - 1]}`;
+}
+
+export function monthName(iso: string): string {
+  return MONTHS[Number(iso.split('-')[1]) - 1] ?? '';
+}
+
+/** Monday first, the way Garmin and the weekly SQL rollups count a week. */
+export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Calendar arithmetic on ISO dates, in UTC so no daylight-saving hour moves a day. */
+export function addDays(iso: string, days: number): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(year!, month! - 1, day! + days));
+  return d.toISOString().slice(0, 10);
+}
+
+/** The Monday of the week an ISO date falls in. */
+export function mondayOf(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const weekday = (new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay() + 6) % 7;
+  return addDays(iso, -weekday);
 }
 
 export function durationLabel(seconds: number): string {

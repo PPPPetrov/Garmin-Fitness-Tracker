@@ -46,8 +46,9 @@ src/
 web/src/
   api.ts        fetch helpers and every response type
   format.ts     every number, date and name that reaches the screen
-  charts/       Line, Bars, LoadStrip — hand-drawn SVG, no chart library
+  charts/       Line, Bars, LoadCalendar, Gauge, Ring, DayBars — hand-drawn SVG, no chart library
   views/        Overview, Trends, Activities
+  ui.tsx        Card, Info, More, Delta and the shared icons
   app.css       the design system; see interface.md
 data/           SQLite database, token cache, FIT scratch (git-ignored)
 ```

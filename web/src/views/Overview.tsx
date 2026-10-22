@@ -11,9 +11,12 @@ import {
   type Week,
 } from '../api';
 import { BarChart } from '../charts/Bars';
+import { DayBars } from '../charts/DayBars';
+import { Gauge, Ring } from '../charts/Gauge';
 import { LineChart, LineLegend } from '../charts/Line';
-import { LoadStrip, StripLegend } from '../charts/LoadStrip';
+import { CalendarLegend, LoadCalendar, LOAD_STEPS } from '../charts/LoadCalendar';
 import {
+  addDays,
   DASH,
   duration,
   durationLabel,
@@ -21,6 +24,7 @@ import {
   isoDaysAgo,
   km,
   longDate,
+  mondayOf,
   num,
   rideName,
   shortDate,
@@ -28,6 +32,7 @@ import {
   typeName,
   watts,
 } from '../format';
+import { Card, Delta, More } from '../ui';
 
 interface OverviewData {
   today: LoadDay | null;
@@ -55,6 +60,7 @@ export function Overview() {
 
   const { today, weeks, recent } = overview.data;
   const rows = load.data.rows;
+  const todayIso = isoDaysAgo(0);
 
   /* Every figure below is rounded once, here, and the deltas are the difference of the
      values as displayed — so the arithmetic on screen always closes. */
@@ -62,8 +68,6 @@ export function Overview() {
   const fatigue = today ? Math.round(today.fatigue) : null;
   const form = today ? Math.round(today.form) : null;
   const position = reading.state === 'ready' ? reading.data.position : null;
-  /* The form plot reuses the year of load already fetched rather than asking again. */
-  const formDays = rows.slice(-90);
 
   /* The honest comparison for "am I fitter": the same day a year ago. Twelve weeks, read
      in October, measures him against his own August. The curve is fetched from 365 days
@@ -75,19 +79,45 @@ export function Overview() {
   const thenFitness = comparable && yearAgo != null ? Math.round(yearAgo.fitness) : null;
   const change = fitness != null && thenFitness != null ? fitness - thenFitness : null;
 
-  const strip = rows.slice(-90);
-  const unmeasured = strip.filter((r) => r.unmeasured_rides > 0).length;
+  /* Fatigue against a week ago is neither good nor bad on its own, so it stays grey. */
+  const weekAgo = rows.length > 7 ? rows[rows.length - 8] : null;
+  const fatigueChange =
+    fatigue != null && weekAgo != null ? fatigue - Math.round(weekAgo.fatigue) : null;
 
   const peak = rows.reduce(
     (best, r, i) => (r.fitness > (rows[best]?.fitness ?? -Infinity) ? i : best),
     0,
   );
+  const estimated = rows.filter((r) => r.is_estimated === 1).length;
 
-  const thisWeek = weeks[weeks.length - 1];
-  const lastWeek = weeks[weeks.length - 2];
-  const thisWeekHours = thisWeek ? round1(thisWeek.hours) : null;
-  const weekChange =
-    thisWeekHours != null && lastWeek ? round1(thisWeekHours - round1(lastWeek.hours)) : null;
+  /* This week, Monday to today, from the ten most recent rides. If all ten fall inside the
+     week there may be more, and the days cannot be drawn honestly from them. */
+  const monday = mondayOf(todayIso);
+  const thisWeekRides = recent.filter((a) => a.local_date >= monday);
+  const weekComplete = thisWeekRides.length < recent.length;
+  const secondsByDay = new Map<string, number>();
+  for (const a of thisWeekRides) {
+    secondsByDay.set(a.local_date, (secondsByDay.get(a.local_date) ?? 0) + (a.duration_s ?? 0));
+  }
+  const thisWeek = weeks.find((w) => mondayOf(w.week_start) === monday) ?? null;
+
+  /* 26 Monday-weeks, including the ones without a ride, which the rollup leaves out. */
+  const weekHours = new Map<string, number>();
+  for (const w of weeks) {
+    const key = mondayOf(w.week_start);
+    weekHours.set(key, (weekHours.get(key) ?? 0) + w.hours);
+  }
+  const mondays = Array.from({ length: 26 }, (_, k) => addDays(monday, -7 * (25 - k)));
+  const hoursByWeek = mondays.map((m) => weekHours.get(m) ?? 0);
+  const fullWeeks = hoursByWeek.slice(0, -1);
+  const averageHours = fullWeeks.reduce((sum, h) => sum + h, 0) / Math.max(1, fullWeeks.length);
+
+  /* The calendar's thirteen weeks, totalled from the same rows it draws. */
+  const calendarStart = addDays(monday, -7 * 12);
+  const calendarDays = rows.filter((r) => r.local_date >= calendarStart);
+  const calendarRides = calendarDays.reduce((sum, r) => sum + r.ride_count, 0);
+  const ridingDays = calendarDays.filter((r) => r.ride_count > 0).length;
+  const unmeasuredDays = calendarDays.filter((r) => r.unmeasured_rides > 0).length;
 
   const coverage = status.state === 'ready' ? status.data.fieldCoverage : null;
   const trusted = coverage ? coverage.total - coverage.unreliableLoad : null;
@@ -101,7 +131,7 @@ export function Overview() {
       <div className="title-row">
         <div className="title-block">
           <h1>Overview</h1>
-          <p className="finding">
+          <p className="subtitle">
             {fitness == null ? (
               'No rides imported yet. Run a sync to build the curve.'
             ) : (
@@ -112,7 +142,7 @@ export function Overview() {
                     , <strong className="fig">{signed(change)}</strong> on this day last year
                   </>
                 )}
-. Form <strong className="fig">{signed(form ?? 0)}</strong>
+                . Form <strong className="fig">{signed(form ?? 0)}</strong>
                 {position != null && <> sits in {BAND_LABEL[position.band]}</>}.
               </>
             )}
@@ -120,150 +150,114 @@ export function Overview() {
         </div>
       </div>
 
-      <div className="overview-grid">
-        <div className="column">
-          <div className="kpis">
-            <Kpi
-              label="Fitness"
-              lead
-              value={num(fitness)}
-              note={
-                change == null ? (
-                  '42-day average load'
-                ) : (
-                  <>
-                    42-day average load ·{' '}
-                    <span className={change < 0 ? 'bad' : 'good'}>{signed(change)}</span> on last
-                    year
-                  </>
-                )
-              }
-            />
-            <Kpi label="Fatigue" value={num(fatigue)} note="7-day average load" />
-            <Kpi
-              label="Form"
-              value={form == null ? DASH : signed(form)}
-              note={
-                <>
-                  Fitness minus fatigue, lagged a day
-                  {position != null && <> · {BAND_LABEL[position.band]}</>}
-                </>
-              }
-            />
-            <Kpi
-              label="This week"
-              value={thisWeekHours == null ? DASH : num(thisWeekHours, 1)}
-              unit="h"
-              note={
-                thisWeek == null ? (
-                  'No rides this week'
-                ) : (
-                  <>
-                    {num(thisWeek.rides)} ride{thisWeek.rides === 1 ? '' : 's'},{' '}
-                    {num(thisWeek.km, 0)} km
-                    {weekChange != null && <> · {signed(weekChange, 1)} h on last week</>}
-                  </>
-                )
-              }
-            />
-          </div>
-
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Where the form sits</h2>
-              {position != null && (
-                <span className="card-note">
-                  Against <span className="fig">{num(position.measuredDays)}</span> measured days
-                </span>
-              )}
-            </div>
-
-            {reading.state === 'error' && <p className="state state-error">{reading.message}</p>}
-            {reading.state === 'loading' && (
-              <div className="skeleton skeleton-plot" style={{ height: 150 }} />
-            )}
-            {reading.state === 'ready' && position == null && (
-              <p className="state">
-                The history is still inside its 42-day warm-up, so there is nothing to place
-                today against yet.
-              </p>
-            )}
-
-            {position != null && (
-              <>
-                <p className="finding">{placing(position)}</p>
-
-                <div className="rows" style={{ marginTop: 14 }}>
-                  <KeyValue
-                    label={`Form over ${position.change.days} days`}
-                    value={signed(position.change.form)}
-                  />
-                  <KeyValue
-                    label={`Fitness over the same ${position.change.days} days`}
-                    value={signed(position.change.fitness)}
-                    tone={
-                      position.change.fitness < 0
-                        ? 'bad'
-                        : position.change.fitness > 0
-                          ? 'good'
-                          : undefined
-                    }
-                  />
-                  <KeyValue
-                    label={`Last in ${BAND_LABEL[position.band]}`}
-                    value={position.lastInBand ? longDate(position.lastInBand) : 'Never before'}
-                  />
-                </div>
-
-                <p className="chart-note">
-                  Form rises when fitness falls as surely as when fatigue does, so the pair is
-                  read together, never the top line alone. Neither is a measurement of recovery.
-                </p>
-
-                <div style={{ marginTop: 18 }}>
-                  <LineChart
-                    labels={formDays.map((r) => shortDate(r.local_date))}
-                    height={168}
-                    yUnit="points"
-                    series={[
-                      {
-                        name: 'Form',
-                        colour: 'var(--chart-1)',
-                        width: 2,
-                        values: formDays.map((r) => r.form),
-                      },
-                    ]}
-                  />
-                </div>
-                <p className="chart-note">
-                  Last 90 days, with the heavy line at zero.
-                  {position.confidence.estimated > 0 && (
+      <div className="stack">
+        <div className="grid grid-4">
+          <Card
+            title="Fitness"
+            info="The 42-day weighted average of daily Garmin training load: what months of riding have built."
+          >
+            <div className="kpi">
+              <div className="kpi-text">
+                <div className="figure">{num(fitness)}</div>
+                <div className="caption">
+                  {change == null ? (
+                    '42-day average load'
+                  ) : (
                     <>
-                      {' '}
-                      <span className="fig">{num(position.confidence.estimated)}</span> of these{' '}
-                      <span className="fig">{num(position.confidence.days)}</span> days stand on a
-                      42-day window with an unmeasured ride inside it, so the level is less certain
-                      than the shape.
+                      <Delta
+                        value={change}
+                        text={num(Math.abs(change))}
+                        tone={change < 0 ? 'bad' : 'good'}
+                      />{' '}
+                      on this day last year
                     </>
                   )}
-                </p>
-              </>
-            )}
-          </section>
+                </div>
+              </div>
+            </div>
+          </Card>
 
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Fitness and fatigue</h2>
+          <Card
+            title="Fatigue"
+            info="The 7-day weighted average of daily training load: how much of the last week you are still carrying."
+          >
+            <div className="kpi">
+              <div className="kpi-text">
+                <div className="figure">{num(fatigue)}</div>
+                <div className="caption">
+                  {fatigueChange == null ? (
+                    '7-day average load'
+                  ) : (
+                    <>
+                      <Delta
+                        value={fatigueChange}
+                        text={num(Math.abs(fatigueChange))}
+                        tone="even"
+                      />{' '}
+                      on a week ago
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            title="Form"
+            info="Fitness minus fatigue, lagged a day. Above zero you are fresher than your training; below it you are carrying the work. Neither is a measurement of recovery."
+          >
+            <div className="kpi">
+              <div className="kpi-text">
+                <div className="figure">{form == null ? DASH : signed(form)}</div>
+                <div className="caption">Fitness minus fatigue</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card
+            title="This week"
+            info="Garmin ride time since Monday, not moving time: a long café stop counts."
+          >
+            <div className="kpi">
+              <div className="kpi-text">
+                <div className="figure">
+                  {thisWeek == null ? '0.0' : num(round1(thisWeek.hours), 1)}
+                  <span className="unit">h</span>
+                </div>
+                <div className="caption">
+                  {thisWeek == null ? (
+                    'No rides since Monday'
+                  ) : (
+                    <>
+                      <span className="fig">{num(thisWeek.rides)}</span> ride
+                      {thisWeek.rides === 1 ? '' : 's'} ·{' '}
+                      <span className="fig">{num(thisWeek.km, 0)}</span> km
+                    </>
+                  )}
+                </div>
+              </div>
+              {weekComplete && <DayBars monday={monday} today={todayIso} seconds={secondsByDay} />}
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-2-1">
+          <Card
+            title="Fitness and fatigue"
+            info="In Garmin training-load points. Fitness is the 42-day weighted average of daily load and fatigue the 7-day one, so fatigue moves first."
+            aside={
               <LineLegend
                 series={[
                   { name: 'Fitness', colour: 'var(--chart-1)' },
-                  { name: 'Fatigue', colour: 'var(--chart-grey)' },
+                  { name: 'Fatigue', colour: 'var(--chart-2)' },
                 ]}
               />
-            </div>
+            }
+          >
             <LineChart
               labels={rows.map((r) => shortDate(r.local_date))}
-              height={274}
+              tipLabels={rows.map((r) => longDate(r.local_date))}
+              height={300}
               yUnit="points"
               annotations={
                 rows[peak]
@@ -279,131 +273,251 @@ export function Overview() {
               series={[
                 {
                   name: 'Fatigue',
-                  colour: 'var(--chart-grey)',
-                  width: 1.25,
+                  colour: 'var(--chart-2)',
+                  width: 1.5,
                   values: rows.map((r) => r.fatigue),
                 },
                 {
                   name: 'Fitness',
                   colour: 'var(--chart-1)',
-                  width: 2.25,
+                  width: 2.5,
                   values: rows.map((r) => r.fitness),
                 },
               ]}
             />
-            <p className="chart-note">
-              Last 12 months, in Garmin training-load points. Fitness is the 42-day weighted
-              average of daily load and fatigue the 7-day one, so fatigue moves first.
+            <p className="note">
+              Last 12 months.
+              {estimated > 0 && (
+                <>
+                  {' '}
+                  <span className="fig">{num(estimated)}</span> of these{' '}
+                  <span className="fig">{num(rows.length)}</span> days sit within 42 days of a ride
+                  the model cannot measure, so the curve runs below the real work there.
+                </>
+              )}
             </p>
-          </section>
+          </Card>
 
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Every ride, last 90 days</h2>
-              <span className="card-note">Training load per day</span>
-            </div>
-            <LoadStrip days={strip} />
-            <div style={{ marginTop: 10 }}>
-              <StripLegend />
-            </div>
-            <p className="chart-note">
-              An open column is a day with a ride Garmin gave no usable load: no value at all, or
-              a ride recorded without a heart-rate strap, where the figure comes back about eight
-              times too low. {num(unmeasured)} of these 90 days are drawn that way.
-            </p>
-          </section>
-
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Weekly hours</h2>
-              <span className="card-note">Last 26 weeks</span>
-            </div>
-            <BarChart
-              labels={weeks.map((w) => shortDate(w.week_start))}
-              values={weeks.map((w) => w.hours)}
-              yUnit="hours"
-              height={200}
-            />
-            <p className="chart-note">
-              Garmin ride time, not moving time: a long café stop counts.
-            </p>
-          </section>
-        </div>
-
-        <div className="column">
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Recent rides</h2>
-              <span className="card-note">Load</span>
-            </div>
-            <div className="rows">
-              {recent.slice(0, 6).map((a) => (
-                <div className="row" key={a.activity_id}>
-                  <div className="row-main">
-                    <div className="row-name">
-                      {rideName(a.activity_name, typeName(a.activity_type))}
-                    </div>
-                    <div className="row-sub">
-                      {shortDate(a.local_date)} · {typeName(a.activity_type)} ·{' '}
-                      {duration(a.duration_s)} · <span className="fig">{km(a.distance_m, 0)}</span>{' '}
-                      km
-                    </div>
-                  </div>
-                  <div className="row-figure fig">
-                    {a.activity_training_load == null ? (
-                      <span className="dash">{DASH}</span>
-                    ) : (
-                      num(a.activity_training_load)
-                    )}
-                  </div>
-                </div>
-              ))}
-              {recent.length === 0 && <p className="state">No rides imported yet.</p>}
-            </div>
-            <div className="card-foot">
-              <a className="link" href="#activities">
-                View all {num(coverage?.total)} rides
-              </a>
-            </div>
-          </section>
-
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">What the model can see</h2>
-            </div>
-            {coverage == null ? (
-              <p className="state">Coverage is still loading.</p>
-            ) : (
+          <Card
+            title="Where the form sits"
+            info="Today's form placed among every measured day of your own history. A +12 is a good day for one rider and a flat one for another, so the dial is yours, not a norm."
+            aside={
+              position != null && (
+                <span>
+                  <span className="fig">{num(position.measuredDays)}</span> days
+                </span>
+              )
+            }
+            foot={<More href="#trends">Form over time</More>}
+          >
+            {reading.state === 'error' && <p className="state state-error">{reading.message}</p>}
+            {reading.state === 'loading' && (
+              <div className="skeleton skeleton-plot" style={{ height: 160 }} />
+            )}
+            {reading.state === 'ready' && position == null && (
+              <p className="state">
+                The history is still inside its 42-day warm-up, so there is nothing to place today
+                against yet.
+              </p>
+            )}
+            {position != null && (
               <>
-                <div className="meter-head">
-                  <span>
-                    <span className="fig">{num(trusted)}</span> rides with a load it can trust
-                  </span>
-                  <span className="fig">{num(coverage.total)}</span>
-                </div>
-                <div className="meter">
-                  <div
-                    className="meter-fill"
-                    style={{ width: `${((trusted ?? 0) / coverage.total) * 100}%` }}
+                <Gauge
+                  value={position.percentile / 100}
+                  label={`Form is higher than ${position.percentile}% of measured days`}
+                  ends={['Hardest', 'Freshest']}
+                  centre={
+                    <>
+                      <div className="figure">{signed(position.form, 0)}</div>
+                      <div className="caption">
+                        Higher than <span className="fig">{position.percentile}%</span> of days
+                      </div>
+                    </>
+                  }
+                />
+                <p className="note" style={{ marginBottom: 12 }}>
+                  {placing(position)}
+                </p>
+                <div className="rows">
+                  <KeyValue
+                    label={`Form over ${position.change.days} days`}
+                    value={signed(position.change.form)}
+                  />
+                  <KeyValue
+                    label={`Fitness over ${position.change.days} days`}
+                    value={signed(position.change.fitness)}
+                    tone={
+                      position.change.fitness < 0
+                        ? 'bad'
+                        : position.change.fitness > 0
+                          ? 'good'
+                          : undefined
+                    }
+                  />
+                  <KeyValue
+                    label={`Last in ${BAND_SHORT[position.band]}`}
+                    value={position.lastInBand ? longDate(position.lastInBand) : 'Never before'}
                   />
                 </div>
-                <div className="rows" style={{ marginTop: 12 }}>
-                  <KeyValue label="No training load at all" value={num(noLoad)} />
-                  <KeyValue label="Recorded without a strap" value={num(noStrap)} />
-                  <KeyValue label="With a power-based TSS" value={num(coverage.withTss)} />
-                </div>
-                <p className="chart-note">
-                  Both kinds are counted rather than averaged in.
-                </p>
               </>
             )}
-          </section>
+          </Card>
+        </div>
 
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Best power held</h2>
-              <span className="card-note">All time</span>
+        <div className="grid grid-1-2">
+          <div className="column">
+            <Card
+              title="Load by day"
+              info={`Each square is a day, filled by its Garmin training load: under ${LOAD_STEPS[0]}, ${LOAD_STEPS[0]}–${LOAD_STEPS[1]! - 1}, ${LOAD_STEPS[1]}–${LOAD_STEPS[2]! - 1}, and ${LOAD_STEPS[2]} points or more. A hatched square is a ride Garmin gave no usable load: no value at all, or no heart-rate strap, where the figure comes back about eight times too low.`}
+              aside="Last 13 weeks"
+              bodyClassName="calendar-body"
+            >
+              <div className="calendar-layout">
+                <div className="headline">
+                  <div className="figure">
+                    {num(calendarRides)}
+                    <span className="unit">rides</span>
+                  </div>
+                  <div className="caption">
+                    on <span className="fig">{num(ridingDays)}</span> days ·{' '}
+                    <span className="fig">{num(unmeasuredDays)}</span> not measured
+                  </div>
+                </div>
+                <LoadCalendar days={calendarDays} today={todayIso} />
+                <CalendarLegend />
+              </div>
+            </Card>
+
+            <Card
+              title="What the model can see"
+              info="A ride with no training load at all, or one recorded without a heart-rate strap, where Garmin's figure comes back about eight times too low, cannot feed the fitness curve. Both kinds are counted here rather than averaged in."
+              aside="All rides"
+            >
+              {coverage == null ? (
+                <div className="skeleton skeleton-plot" style={{ height: 84 }} />
+              ) : (
+                <>
+                  <div className="ring-block">
+                    <Ring
+                      share={(trusted ?? 0) / Math.max(1, coverage.total)}
+                      label={`${num(trusted)} of ${num(coverage.total)} rides carry a load the model can trust`}
+                    />
+                    <div>
+                      <div className="figure figure-sm">
+                        {num(trusted)}
+                        <span className="unit">of {num(coverage.total)}</span>
+                      </div>
+                      <div className="caption">rides carry a load it can trust</div>
+                    </div>
+                  </div>
+                  <div className="rows">
+                    <KeyValue label="No training load at all" value={num(noLoad)} />
+                    <KeyValue label="Recorded without a strap" value={num(noStrap)} />
+                    <KeyValue label="With a power-based TSS" value={num(coverage.withTss)} />
+                  </div>
+                </>
+              )}
+            </Card>
+          </div>
+
+          <Card
+            title="Recent rides"
+            aside="Load is Garmin training load"
+            flush
+            foot={
+              <More href="#activities" accent>
+                View all {num(status.state === 'ready' ? status.data.coverage.total : null)} rides
+              </More>
+            }
+          >
+            {recent.length === 0 ? (
+              <p className="state" style={{ margin: 16 }}>
+                No rides imported yet.
+              </p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th className="hide-phone">Date</th>
+                    <th>Ride</th>
+                    <th className="hide-phone">Type</th>
+                    <th className="num hide-phone">Time</th>
+                    <th className="num hide-phone">km</th>
+                    <th className="num">Load</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.slice(0, RECENT_ROWS).map((a) => {
+                    const flag = unusableLoad(a);
+                    return (
+                      <tr key={a.activity_id}>
+                        <td className="date hide-phone fig">{shortDate(a.local_date)}</td>
+                        <td className="name">
+                          <div className="cell-name">
+                            {rideName(a.activity_name, typeName(a.activity_type))}
+                          </div>
+                          {flag && <div className="sub hide-phone">{flag}</div>}
+                          <div className="sub phone-only">
+                            {shortDate(a.local_date)} · {typeName(a.activity_type)} ·{' '}
+                            {duration(a.duration_s)} · {km(a.distance_m, 0)} km
+                          </div>
+                        </td>
+                        <td className="hide-phone">
+                          <span className="pill">{typeName(a.activity_type)}</span>
+                        </td>
+                        <td className="num hide-phone">{duration(a.duration_s)}</td>
+                        <td className="num hide-phone">{km(a.distance_m)}</td>
+                        <td className="num" style={{ fontWeight: 600 }}>
+                          {a.activity_training_load == null ? (
+                            <span className="dash">{DASH}</span>
+                          ) : (
+                            num(a.activity_training_load)
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        </div>
+
+        <div className="grid grid-2-1">
+          <Card
+            title="Weekly hours"
+            info="Garmin ride time, not moving time: a long café stop counts. This week is drawn pale until it is over."
+            aside="Last 26 weeks"
+          >
+            <div className="headline">
+              <div className="figure">
+                {num(averageHours, 1)}
+                <span className="unit">h</span>
+              </div>
+              <div className="caption">
+                a week on average over the last <span className="fig">{fullWeeks.length}</span> full
+                weeks
+              </div>
             </div>
+            <BarChart
+              labels={mondays.map(shortDate)}
+              values={hoursByWeek}
+              pale={mondays.map((m) => m === monday)}
+              titles={mondays.map(
+                (m, i) =>
+                  `Week of ${longDate(m)} · ${num(hoursByWeek[i], 1)} h${m === monday ? ' so far' : ''}`,
+              )}
+              yUnit="hours"
+              height={300}
+            />
+          </Card>
+
+          <Card
+            title="Best power held"
+            info="The highest average power held for each duration, from the original ride files. Only rides with a power meter count, so none of the mountain biking is in it."
+            aside="All time"
+            foot={<More href="#trends">Power by season</More>}
+          >
             {power.state === 'error' && <p className="state state-error">{power.message}</p>}
             {power.state === 'ready' && bests.length === 0 && (
               <p className="state">
@@ -415,32 +529,40 @@ export function Overview() {
                 <div className="row" key={p.duration_s}>
                   <div className="row-main">
                     <div className="row-name">{durationLabel(p.duration_s)}</div>
-                    <div className="row-sub">Set {longDate(p.local_date)}</div>
+                    <div className="row-sub">{longDate(p.local_date)}</div>
                   </div>
                   <div className="row-figure">
-                    <span className="fig">{watts(p.watts)}</span>
+                    {watts(p.watts)}
                     <span className="unit"> W</span>
                   </div>
                 </div>
               ))}
             </div>
             {power.state === 'ready' && power.data.heldBack > 0 && (
-              <p className="chart-note">{heldBackNote(power.data.heldBack)}</p>
+              <p className="note">{heldBackNote(power.data.heldBack)}</p>
             )}
-            <div className="card-foot">
-              <a className="link" href="#trends">
-                The whole curve
-              </a>
-            </div>
-          </section>
+          </Card>
         </div>
       </div>
     </>
   );
 }
 
+/* As many rides as the two cards beside them are tall, so the row ends on one line. */
+const RECENT_ROWS = 10;
+
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+/**
+ * The same test the load model uses, so a row flagged here is a row the curve discounts:
+ * no training load at all, or no heart-rate strap on a ride long enough to matter.
+ */
+function unusableLoad(a: Activity): string | null {
+  if (a.activity_training_load == null) return 'No training load';
+  if (a.avg_hr == null && (a.duration_s ?? 0) > 600) return 'No heart-rate strap';
+  return null;
 }
 
 /** Six durations a rider actually talks about, from whatever the curve holds. */
@@ -464,6 +586,14 @@ const BAND_LABEL: Record<FormBand, string> = {
   buried: 'your hardest fifth',
 };
 
+const BAND_SHORT: Record<FormBand, string> = {
+  freshest: 'the freshest fifth',
+  fresh: 'the second-freshest fifth',
+  typical: 'the middle fifth',
+  tired: 'the second-hardest fifth',
+  buried: 'the hardest fifth',
+};
+
 function ordinal(n: number): string {
   const rest = n % 100;
   if (rest >= 11 && rest <= 13) return `${n}th`;
@@ -473,58 +603,29 @@ function ordinal(n: number): string {
 /**
  * Where today stands. At either extreme the rank is the vivid and honest figure —
  * "the 5th freshest day in 1,430" says something a percentile rounds away — and in
- * the broad middle the percentile is the one that means anything.
+ * the broad middle the percentile, already on the dial, is the one that means anything.
  */
 function placing(p: FormPosition): React.ReactNode {
-  const total = <strong className="fig">{num(p.measuredDays)}</strong>;
+  const total = <span className="fig">{num(p.measuredDays)}</span>;
   const where =
     p.rank <= 10 ? (
       <>
-        the <strong className="fig">{ordinal(p.rank)}</strong> freshest day in {total} measured
+        The <span className="fig">{ordinal(p.rank)}</span> freshest day in {total}
       </>
     ) : p.rank > p.measuredDays - 10 ? (
       <>
-        the <strong className="fig">{ordinal(p.measuredDays - p.rank + 1)}</strong> hardest day in{' '}
-        {total} measured
+        The <span className="fig">{ordinal(p.measuredDays - p.rank + 1)}</span> hardest day in{' '}
+        {total}
       </>
     ) : (
-      <>
-        higher than <strong className="fig">{p.percentile}%</strong> of {total} measured days
-      </>
+      <>In {BAND_SHORT[p.band]}</>
     );
 
   return (
     <>
-      Form <strong className="fig">{signed(p.form, 0)}</strong>: {where}, and the{' '}
-      <strong className="fig">{ordinal(p.streak)}</strong> day running{' '}
+      {where}, and the <span className="fig">{ordinal(p.streak)}</span> day running{' '}
       {p.form >= 0 ? 'above' : 'below'} zero.
     </>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  unit,
-  note,
-  lead,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-  note?: React.ReactNode;
-  /** The figure that answers the screen's question. One per screen. */
-  lead?: boolean;
-}) {
-  return (
-    <div className={lead ? 'kpi kpi-lead' : 'kpi'}>
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-value fig">
-        {value}
-        {unit && <span className="kpi-unit">{unit}</span>}
-      </div>
-      {note && <div className="kpi-note">{note}</div>}
-    </div>
   );
 }
 
@@ -539,11 +640,13 @@ function KeyValue({
   tone?: 'good' | 'bad';
 }) {
   return (
-    <div className="row" style={{ minHeight: 32 }}>
+    <div className="row row-tight">
       <div className="row-main">
-        <div className="row-name">{label}</div>
+        <div className="row-sub" style={{ fontSize: 13, color: 'var(--text)' }}>
+          {label}
+        </div>
       </div>
-      <div className={tone ? `row-figure fig ${tone}` : 'row-figure fig'}>{value}</div>
+      <div className={tone ? `row-figure ${tone}` : 'row-figure'}>{value}</div>
     </div>
   );
 }
@@ -554,7 +657,7 @@ function Failed({ what, message }: { what: string; message: string }) {
       <div className="title-row">
         <div className="title-block">
           <h1>Overview</h1>
-          <p className="finding">The numbers below could not be read from the local database.</p>
+          <p className="subtitle">The numbers below could not be read from the local database.</p>
         </div>
       </div>
       <p className="state state-error">
@@ -572,40 +675,25 @@ function Loading() {
       <div className="title-row">
         <div className="title-block">
           <h1>Overview</h1>
-          <p className="finding">Reading the local database…</p>
+          <p className="subtitle">Reading the local database…</p>
         </div>
       </div>
-      <div className="overview-grid">
-        <div className="column">
-          <div className="kpis">
-            {['Fitness', 'Fatigue', 'Form', 'This week'].map((label) => (
-              <div className="kpi" key={label}>
-                <div className="kpi-label">{label}</div>
-                <div className="skeleton skeleton-value" />
-                <div className="kpi-note">&nbsp;</div>
-              </div>
-            ))}
-          </div>
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Fitness and fatigue</h2>
-            </div>
-            <div className="skeleton skeleton-plot" style={{ height: 274 }} />
-          </section>
+      <div className="stack">
+        <div className="grid grid-4">
+          {['Fitness', 'Fatigue', 'Form', 'This week'].map((label) => (
+            <Card title={label} key={label}>
+              <div className="skeleton skeleton-value" />
+              <div className="caption">&nbsp;</div>
+            </Card>
+          ))}
         </div>
-        <div className="column">
-          <section className="card">
-            <div className="card-head">
-              <h2 className="card-title">Recent rides</h2>
-            </div>
-            <div className="rows">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div className="row" key={i}>
-                  <div className="skeleton skeleton-row" style={{ width: '70%' }} />
-                </div>
-              ))}
-            </div>
-          </section>
+        <div className="grid grid-2-1">
+          <Card title="Fitness and fatigue">
+            <div className="skeleton skeleton-plot" style={{ height: 300 }} />
+          </Card>
+          <Card title="Where the form sits">
+            <div className="skeleton skeleton-plot" style={{ height: 300 }} />
+          </Card>
         </div>
       </div>
     </>
