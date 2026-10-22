@@ -15,7 +15,8 @@ export default defineConfig(({ mode }) => {
       port: Number(env.WEB_PORT ?? 5273),
       strictPort: true,
       proxy: {
-        '/api': `http://localhost:${apiPort}`,
+        // Not "localhost": that can resolve to ::1, and the API listens on IPv4 loopback only.
+        '/api': `http://127.0.0.1:${apiPort}`,
       },
     },
     build: {

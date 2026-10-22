@@ -263,6 +263,8 @@ app.get('/api/types', (c) => {
   return c.json({ rows });
 });
 
-serve({ fetch: app.fetch, port: config.apiPort }, (info) => {
-  process.stdout.write(`API listening on http://localhost:${info.port}\n`);
+// Loopback only: the API has no authentication, and POST /api/sync spends the Garmin key.
+// Without a hostname, Node listens on every interface and the LAN can reach it.
+serve({ fetch: app.fetch, port: config.apiPort, hostname: '127.0.0.1' }, (info) => {
+  process.stdout.write(`API listening on http://127.0.0.1:${info.port}\n`);
 });
