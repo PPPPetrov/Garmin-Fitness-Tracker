@@ -47,7 +47,7 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function today(): string {
+export function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -219,28 +219,42 @@ export function loadCoverage(): {
     .get() as { total: number; withLoad: number; withTss: number; unreliableLoad: number };
 }
 
-/** The best power ever recorded at each duration, with the ride it came from. */
-export function bestPowerCurve(sinceDate?: string): {
+/**
+ * The best power recorded at each duration, with the ride it came from.
+ *
+ * Both bounds are optional, and a season is compared with the same span of the season
+ * before it: a peak held over ten months against one held over twelve is not a
+ * comparison, it is a longer dice roll.
+ */
+export function bestPowerCurve(
+  sinceDate?: string,
+  untilDate?: string,
+): {
   duration_s: number;
   watts: number;
   activity_id: number;
   local_date: string;
 }[] {
+  const since = sinceDate ?? null;
+  const until = untilDate ?? null;
   return db()
     .prepare(
       `SELECT p.duration_s, p.watts, p.activity_id, a.local_date
          FROM power_curve p
          JOIN activity a ON a.activity_id = p.activity_id
         WHERE (? IS NULL OR a.local_date >= ?)
+          AND (? IS NULL OR a.local_date <= ?)
           AND p.watts = (
             SELECT MAX(p2.watts) FROM power_curve p2
             JOIN activity a2 ON a2.activity_id = p2.activity_id
-            WHERE p2.duration_s = p.duration_s AND (? IS NULL OR a2.local_date >= ?)
+            WHERE p2.duration_s = p.duration_s
+              AND (? IS NULL OR a2.local_date >= ?)
+              AND (? IS NULL OR a2.local_date <= ?)
           )
         GROUP BY p.duration_s
         ORDER BY p.duration_s`,
     )
-    .all(sinceDate ?? null, sinceDate ?? null, sinceDate ?? null, sinceDate ?? null) as {
+    .all(since, since, until, until, since, since, until, until) as {
     duration_s: number;
     watts: number;
     activity_id: number;

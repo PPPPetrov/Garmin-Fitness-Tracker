@@ -161,12 +161,48 @@ The best power ever held at each duration, with the ride that set it.
 | Parameter | Default | Meaning |
 | --- | --- | --- |
 | `since` | — | Only consider rides on or after this `local_date`. |
+| `to` | — | Only consider rides on or before this `local_date`. |
 
 ```json
 { "rows": [ { "duration_s": 300, "watts": 344.1, "activity_id": 123, "local_date": "2026-05-02" } ] }
 ```
 
 One row per duration, ascending. Durations with no data are absent rather than zero.
+
+Both bounds together are what make a season comparable with the one before it: the Trends
+screen asks for this year, then for last year stopped on today's day of the year. A peak
+held over ten months against one held over twelve is not a comparison.
+
+---
+
+## `GET /api/seasons`
+
+Each calendar year, counted only as far into it as today is.
+
+```json
+{ "rows": [ { "year": 2026, "rides": 147, "hours": 406.8, "km": 8054, "elevation_m": 105716, "load_points": 23442 } ] }
+```
+
+Newest year first. The cutoff is today's month and day, so a season in progress is held
+against the same span of the ones before it rather than against their full twelve months.
+The first year of the history is short for the same honest reason: it begins on the day
+the account does.
+
+---
+
+## `GET /api/ftp`
+
+The dated steps in Garmin's own threshold estimate.
+
+```json
+{ "steps": [ { "from": "2025-11-15", "watts": 189 }, { "from": "2026-01-25", "watts": 200 } ] }
+```
+
+Every powered ride carries the FTP in effect on its date, so no history table is needed:
+this reduces those rides to the days the figure changed. `from` is the first ride that
+carried the new value, which is the day it is known to have been in effect, not
+necessarily the day Garmin decided it. The estimate falls as well as rises — it drifts
+down when no hard effort is recorded — so a step down is not necessarily lost fitness.
 
 ---
 

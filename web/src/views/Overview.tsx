@@ -49,8 +49,14 @@ export function Overview() {
   const fatigue = today ? Math.round(today.fatigue) : null;
   const form = today ? Math.round(today.form) : null;
 
-  const twelveWeeksAgo = rows.find((r) => r.local_date >= isoDaysAgo(84));
-  const thenFitness = twelveWeeksAgo ? Math.round(twelveWeeksAgo.fitness) : null;
+  /* The honest comparison for "am I fitter": the same day a year ago. Twelve weeks, read
+     in October, measures him against his own August. The curve is fetched from 365 days
+     back, so its first row is that day, unless the history is shorter than a year or that
+     day still sat inside the 42-day warm-up, when there is nothing to compare with. */
+  const yearAgo = rows[0] ?? null;
+  const comparable =
+    yearAgo != null && yearAgo.local_date <= isoDaysAgo(358) && yearAgo.is_warmup === 0;
+  const thenFitness = comparable && yearAgo != null ? Math.round(yearAgo.fitness) : null;
   const change = fitness != null && thenFitness != null ? fitness - thenFitness : null;
 
   const strip = rows.slice(-90);
@@ -87,7 +93,7 @@ export function Overview() {
                 Fitness is <strong className="fig">{num(fitness)}</strong> points
                 {change != null && (
                   <>
-                    , <strong className="fig">{signed(change)}</strong> on twelve weeks ago
+                    , <strong className="fig">{signed(change)}</strong> on this day last year
                   </>
                 )}
                 . Form <strong className="fig">{signed(form ?? 0)}</strong>:{' '}
@@ -112,8 +118,8 @@ export function Overview() {
                 ) : (
                   <>
                     42-day average load ·{' '}
-                    <span className={change < 0 ? 'bad' : 'good'}>{signed(change)}</span> on twelve
-                    weeks ago
+                    <span className={change < 0 ? 'bad' : 'good'}>{signed(change)}</span> on last
+                    year
                   </>
                 )
               }
