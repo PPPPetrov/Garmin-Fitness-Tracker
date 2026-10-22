@@ -102,6 +102,52 @@ than being absent. The three flags are what the dashboard draws:
 
 ---
 
+## `GET /api/form`
+
+Where today's form sits in the rider's own history. Everything here is read from
+`daily_load`; nothing new is stored.
+
+```json
+{
+  "position": {
+    "date": "2026-10-22",
+    "form": 39.93, "fitness": 73.33,
+    "percentile": 99, "rank": 5, "measuredDays": 1430,
+    "band": "freshest", "streak": 13,
+    "change":     { "days": 28, "form": 42.55, "fitness": -20.99 },
+    "lastInBand": "2026-10-04",
+    "confidence": { "estimated": 53, "days": 90 }
+  },
+  "windows": { "change": 28, "confidence": 90 }
+}
+```
+
+`position` is `null` while the whole history is still inside its 42-day warm-up.
+
+| Field | Meaning |
+| --- | --- |
+| `percentile` | Share of measured days with a lower form. **Floored**, so a day with four days above it reports 99 rather than rounding to 100 and claiming to have beaten every day on record. |
+| `rank` | 1 is the freshest day ever recorded. |
+| `measuredDays` | Days behind the ranking. Warm-up days are not among them. |
+| `band` | Which fifth of this rider's own form distribution today falls in: `buried`, `tired`, `typical`, `fresh`, `freshest`. Derived from the distribution, never from an absolute number. |
+| `streak` | Consecutive days ending today on the same side of zero, today included. A form of exactly zero counts as the positive side. |
+| `change` | Form **and** fitness over the same trailing window, with the span actually available — a young history reports what it measured rather than assuming 28 days. |
+| `lastInBand` | The last day before the current run that was also in this band, or `null`. The current run is skipped, or the answer would always be yesterday. |
+| `confidence` | How many of the last 90 days carry `is_estimated`. |
+
+**Why `change` carries fitness.** Form rises when fitness falls exactly as it rises when
+fatigue does. A +40 reached by tapering and a +40 reached by not riding for a fortnight are
+the same number and opposite situations, and only the fitness line over the same window
+tells them apart. The two are returned together so a caller cannot read one without the
+other.
+
+**Why the band and not a threshold.** The generic cycling figures — above +15 fresh, below
+−10 tired — are somebody else's. Against this history −10 is an ordinary Tuesday: a quarter
+of all measured days sit below it. The bands are fifths of the rider's own distribution, so
+they mean something for this rider and nothing for anyone else.
+
+---
+
 ## `GET /api/weeks`
 
 Weekly rollups over an arbitrary range. Same `from` / `to` as `/api/load`.

@@ -1,5 +1,10 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import {
+  CHANGE_WINDOW_DAYS,
+  CONFIDENCE_WINDOW_DAYS,
+  currentFormPosition,
+} from './calc/form.js';
 import { bestPowerCurve, loadCoverage, recomputeDailyLoad, today } from './calc/load.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
@@ -108,6 +113,13 @@ app.get('/api/load', (c) => {
     )
     .all(from, to);
   return c.json({ rows, formula: 'EWMA of Garmin activity training load; 42d fitness, 7d fatigue' });
+});
+
+app.get('/api/form', (c) => {
+  return c.json({
+    position: currentFormPosition(),
+    windows: { change: CHANGE_WINDOW_DAYS, confidence: CONFIDENCE_WINDOW_DAYS },
+  });
 });
 
 app.get('/api/activities', (c) => {

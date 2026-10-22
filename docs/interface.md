@@ -75,7 +75,7 @@ Each answers one question, and the biggest block on it is the answer.
 
 | Screen | Question | Shape |
 | --- | --- | --- |
-| Overview | Am I fitter than I was, and how much fatigue am I carrying into today? | KPI strip, main chart, the load strip, weekly hours; a 384px rail of recent rides, coverage and best powers |
+| Overview | Am I fitter than I was, and how much fatigue am I carrying into today? | KPI strip, the form placing, main chart, the load strip, weekly hours; a 384px rail of recent rides, coverage and best powers |
 | Trends | How has the load moved over this period, and what are my best powers? | No cards: a 6-figure row, two full-width charts, then a 2 × 2 grid of small tables whose rows align across the columns |
 | Activities | Find the ride I am thinking of. | Filters, one full-width table, paging with the range stated |
 

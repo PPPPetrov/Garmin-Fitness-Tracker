@@ -106,6 +106,46 @@ small to matter.
 None of this corrects the number. The work happened and the model cannot see it; the honest
 thing is to say so where the number is read, not to interpolate something plausible.
 
+## Placing today's form
+
+Form on its own is close to unreadable, and the usual thresholds make it worse. The generic
+cycling figures — above +15 fresh, below −10 tired — belong to somebody else's history.
+Against this one, −10 is an ordinary Tuesday: a quarter of all measured days sit below it.
+
+[`src/calc/form.ts`](../src/calc/form.ts) places today against the rider's own measured days
+instead. It stores nothing; it reads `daily_load` and reports a position.
+
+| Figure | What it is |
+| --- | --- |
+| `percentile`, `rank` | Where today's form falls among all non-warm-up days. The percentile is **floored**: with four days above it, 99.65% must not round to 100 and claim today beat every day on record. |
+| `band` | Which fifth of the rider's own distribution today is in. A fifth, never a number. |
+| `streak` | Consecutive days ending today on the same side of zero. Zero itself counts as the fresh side, so a run does not break on it. |
+| `change` | Form **and** fitness over the same 28 days. |
+| `lastInBand` | The last day before the current run that was also in this band. |
+| `confidence` | How many of the last 90 days are `is_estimated`. |
+
+**The pair is the point.** Form rises when fitness falls exactly as it rises when fatigue
+does. On 22 October 2026 form was +39.93 — the fifth-freshest day of 1,430 — and over the
+same four weeks fitness had fallen 20.99 points. That is not a taper, and the form figure
+alone cannot say so. The two are computed and returned together so that neither can be read
+without the other.
+
+None of it is advice. Where the number sits is a fact about this history; what to do about
+it is not something arithmetic over Garmin's load figures can know.
+
+### What the form tests pin down
+
+[`src/calc/form.test.ts`](../src/calc/form.test.ts):
+
+- the warm-up is excluded from the ranking, so a young history does not flatter itself;
+- the percentile never reaches 100, because today is one of the days it is counted against;
+- a run of days on one side of zero is counted, and a form of exactly zero does not break it;
+- form and fitness are measured over the same window, and a history shorter than the window
+  reports the span it actually had;
+- the last time in this band skips the run today is in, or the answer would be yesterday;
+- the bands come from the rider's own distribution: the same absolute form lands in the top
+  fifth of one history and the bottom fifth of another.
+
 ## What the model is not
 
 - **Not a recovery measurement.** It describes training you have already done. Garmin's own
