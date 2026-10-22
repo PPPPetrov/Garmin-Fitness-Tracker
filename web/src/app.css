@@ -1,72 +1,78 @@
-/* Framed sheet — seed 105924414.
-   The chrome is one tinted L: a 228px sidebar and a 48px top bar sharing a ground with no
-   rule between them. The work sits on a white sheet inset 8px from the window's right and
-   bottom edges, 16px corners, a 1px edge, no shadow anywhere.
+/* Accent ladder on a framed sheet — style seed 680022942, shell from the reference board.
 
-   Its face: IBM Plex Mono on every figure. A training log is read the way a head unit is
-   read, watts, load points, bpm, kilometres down a column, so the numbers get their own
-   drawing and the prose stays in IBM Plex Sans.
+   The chrome is one warm grey frame: the sidebar sits on it, and the work sits on a white
+   sheet inset 12px from the window's top, right and bottom edges, with its own top bar for
+   search and sync. Every block on the sheet is a card: a pale header band holding the
+   title, a white body, and a footer link only where there is somewhere to go.
 
-   The frame is tinted one low-chroma step of the accent. At #f9fbfc against a white sheet
-   the step was about 1% and the move did not read: sidebar, top bar and sheet looked like
-   one white field, and every section needed a box of its own to exist. The tint does the
-   separating now, so the sections inside the sheet carry no border at all.
+   Its face: one green, laddered. The deep step (--accent) fills the active nav row and the
+   one primary button, with a white label at 4.9:1. The middle step (--chart-1) is every
+   main data mark: the fitness line, the load calendar, the weekly bars, the gauge. The pale
+   steps carry the areas: tracks, the calendar's lighter days, the zone ramp. Nothing else
+   on the screen has a hue.
 
    Grid arithmetic at 1440:
-     sheet   = 1440 − 228 sidebar − 8 inset            = 1204
-     content = 1204 − 2 × 24 padding                   = 1156
-     overview: main 748 + 24 gutter + rail 384         = 1156
-     analytics: two share tables (1156 − 24) / 2 = 566 each
-   One gutter value, 24px, horizontally and vertically. */
+     sheet    = 1440 − 248 sidebar − 12 inset             = 1180
+     content  = 1180 − 2 × 1 border − 2 × 24 padding      = 1130
+     thirds:   (1130 − 2 × 16) / 3 = 366, two thirds 748  → 748 + 16 + 366 = 1130
+     KPIs:     (1130 − 3 × 16) / 4 = 270.5
+     six-up:   (1130 − 5 × 16) / 6 = 175
+   One gutter, 16px, horizontally and vertically. */
 
 :root {
-  --ground: #eaeff1;
+  --ground: #f3f4f0;
   --surface: #ffffff;
-  --raised: #f4f6f8;
-  --active: #dde4e6;
-  --border: #e8eaec;
-  --rule: #f0f1f2;
-  --control: #cdced1;
-  --text: #131416;
-  --muted: #5d5f60;
-  --primary: #131416;
-  --accent: #1b6c80;
-  --positive: #1e7b4f;
+  --band: #f8f9f6;
+  --raised: #f0f2ec;
+  --border: #e4e7df;
+  --rule: #eef0ea;
+  --control: #d4d8cd;
+  --text: #161a13;
+  --muted: #5c6358;
+
+  /* The ladder. 700 fills controls, 500 draws data, 50–300 carry areas. */
+  --accent: #4f7d1d;
+  --accent-hover: #436b18;
+  --accent-ink: #2d4a10;
+  --accent-50: #f4f8ee;
+  --accent-100: #e6f0d8;
+  --accent-200: #cbe1ad;
+  --accent-300: #a5cb76;
+  --chart-1: #67a12f;
+  --chart-2: #c3c8b9;
+  --grid: #edefe9;
+
+  /* With a green accent the good direction is the accent itself, not a second green. */
+  --positive: #4f7d1d;
   --negative: #c4242a;
 
-  --chart-1: #1b6c80;
-  --chart-2: #2f70bb;
-  --chart-3: #a86f0c;
-  --chart-grey: #a9b0b4;
-  --grid: #eceef0;
+  --pill-neutral-bg: #f0f2ec;
+  --pill-neutral-ink: #3f453b;
+  --pill-warning-bg: #fdf3dc;
+  --pill-warning-ink: #7a4807;
+  --pill-negative-bg: #fdecea;
+  --pill-negative-ink: #8a1f1f;
 
-  --pill-neutral-bg: #ebedee;
-  --pill-neutral-ink: #353736;
-  --pill-negative-bg: #ffedea;
-  --pill-negative-ink: #831c1e;
-
-  --radius-card: 8px;
-  --radius-control: 6px;
   --radius-sheet: 16px;
-  --sheet-inset: 8px;
-  --sidebar-width: 228px;
-  --topbar-height: 48px;
-  --row-height: 48px;
-  --gap: 24px;
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --sidebar-width: 248px;
+  --topbar-height: 64px;
+  --sheet-inset: 12px;
+  --gap: 16px;
   --pad: 24px;
-  --card-pad: 20px;
-  --control-height: 32px;
+  --card-pad: 16px;
+  --control-height: 36px;
+  --row-height: 48px;
 
-  --fs-title: 22px;
-  --fs-section: 16px;
-  --fs-kpi: 24px;
+  --fs-title: 28px;
+  --fs-kpi: 28px;
+  --fs-section: 14px;
   --fs-body: 14px;
   --fs-small: 12px;
 
-  --font: 'IBM Plex Sans', Inter, system-ui, sans-serif;
-  /* taste-skill-ignore: the mono is this screen's face, carried by every figure and
-     nothing else, as the style sheet's third face option. Prose stays in the sans. */
-  --font-figure: 'IBM Plex Mono', ui-monospace, monospace;
+  --font: 'DM Sans', Inter, system-ui, sans-serif;
 }
 
 *,
@@ -85,7 +91,7 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs-body);
-  line-height: 1.5;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -93,14 +99,15 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 600;
 }
 
 p {
   margin: 0;
 }
 
-button {
+button,
+input,
+select {
   font: inherit;
   color: inherit;
 }
@@ -109,12 +116,9 @@ a {
   color: inherit;
 }
 
-/* Every figure is set in the mono: KPI values, table cells, anything that updates.
-   Chart ticks and labels stay in the text face. */
+/* Every number that is compared or updates keeps its digits in fixed widths. */
 .fig {
-  font-family: var(--font-figure);
   font-variant-numeric: tabular-nums;
-  font-feature-settings: 'zero' 1;
 }
 
 /* ---------------- the frame ---------------- */
@@ -122,30 +126,28 @@ a {
 .app {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   min-height: 100vh;
-  background: var(--ground);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
   align-self: start;
-  grid-row: 1 / -1;
-  grid-column: 1;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px 12px 16px 16px;
+  padding: var(--sheet-inset) 16px 16px;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 32px;
-  padding: 0 8px;
-  margin-bottom: 24px;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 
 .brand svg {
@@ -154,101 +156,117 @@ a {
 }
 
 .brand-name {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.nav-label {
+  margin: 28px 12px 8px;
+  font-size: var(--fs-small);
+  color: var(--muted);
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  height: 34px;
-  padding: 0 8px;
-  border: 0;
+  height: 40px;
+  padding: 0 12px;
   border-radius: var(--radius-control);
-  background: transparent;
   font-size: var(--fs-body);
+  font-weight: 500;
   color: var(--muted);
-  text-align: left;
   text-decoration: none;
-  cursor: pointer;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
 }
 
 .nav-item svg {
   flex: none;
-  color: var(--muted);
 }
 
 .nav-item:hover {
-  background: var(--active);
+  background: var(--raised);
   color: var(--text);
 }
 
 .nav-item[aria-current='page'] {
-  background: var(--active);
-  color: var(--text);
-  font-weight: 500;
-}
-
-.nav-item[aria-current='page'] svg {
-  color: var(--text);
+  background: var(--accent);
+  color: #fff;
 }
 
 .nav-item:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
-.sidebar-foot {
+/* The scope of everything on the sheet: which rides, over which years. */
+.scope-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-top: auto;
-  padding: 0 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.scope-card svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.scope-main {
+  min-width: 0;
+}
+
+.scope-title {
+  font-weight: 600;
+}
+
+.scope-sub {
   font-size: var(--fs-small);
   color: var(--muted);
 }
 
-/* ---------------- top bar ---------------- */
+/* ---------------- the sheet ---------------- */
+
+.sheet {
+  min-width: 0;
+  margin: var(--sheet-inset) var(--sheet-inset) var(--sheet-inset) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sheet);
+  background: var(--surface);
+}
 
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 3;
-  grid-row: 1;
-  grid-column: 2;
+  z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   height: var(--topbar-height);
-  padding: 0 24px 0 24px;
-  background: var(--ground);
-}
-
-.topbar-scope {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.topbar-scope b {
-  color: var(--text);
-  font-weight: 500;
+  padding: 0 var(--pad);
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--surface);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-left: auto;
   flex: none;
 }
 
@@ -258,21 +276,50 @@ a {
   white-space: nowrap;
 }
 
-.menu-button {
+.menu-button,
+.topbar-title {
   display: none;
 }
 
-/* ---------------- the sheet ---------------- */
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 300px;
+}
 
-.sheet {
-  grid-row: 2;
-  grid-column: 2;
-  min-width: 0;
-  margin: 0 var(--sheet-inset) var(--sheet-inset) 0;
-  padding: var(--pad);
+.search svg {
+  position: absolute;
+  right: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 36px 0 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sheet);
+  border-radius: var(--radius-control);
   background: var(--surface);
+  transition: border-color 0.12s;
+}
+
+.search input::placeholder {
+  color: var(--muted);
+}
+
+.search input:hover {
+  border-color: var(--control);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.page {
+  padding: 28px var(--pad) var(--pad);
 }
 
 /* ---------------- title row ---------------- */
@@ -282,7 +329,7 @@ a {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .title-block {
@@ -291,20 +338,21 @@ a {
 
 h1 {
   font-size: var(--fs-title);
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-.finding {
-  max-width: 76ch;
-  margin-top: 8px;
-  font-size: 15px;
+.subtitle {
+  max-width: 80ch;
+  margin-top: 6px;
+  font-size: var(--fs-body);
   color: var(--muted);
 }
 
-.finding strong {
+.subtitle strong {
   color: var(--text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .title-actions {
@@ -312,7 +360,6 @@ h1 {
   align-items: center;
   gap: 8px;
   flex: none;
-  padding-bottom: 2px;
 }
 
 /* ---------------- controls ---------------- */
@@ -320,46 +367,56 @@ h1 {
 .btn {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
   height: var(--control-height);
-  padding: 0 14px;
+  padding: 0 16px;
   border: 0;
   border-radius: var(--radius-control);
-  background: var(--primary);
+  background: var(--accent);
   color: #fff;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    transform 0.08s;
 }
 
 .btn:hover:not(:disabled) {
-  background: #2b2d30;
+  background: var(--accent-hover);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn:disabled {
-  background: var(--control);
-  cursor: not-allowed;
+  background: var(--accent-300);
+  cursor: progress;
 }
 
 .btn-quiet {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 30px;
+  gap: 6px;
+  height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--surface);
-  color: var(--text);
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.12s;
 }
 
 .btn-quiet:hover:not(:disabled) {
-  background: var(--raised);
+  background: var(--band);
+  border-color: var(--control);
 }
 
-/* A disabled control stays legible: the study flags greys that drop under 4.5:1.
-   The muted fill and the cursor carry the state, not an unreadable label. */
+/* A disabled control stays legible: the fill and the cursor carry the state. */
 .btn-quiet:disabled {
-  background: var(--raised);
+  background: var(--band);
   color: var(--muted);
   cursor: not-allowed;
 }
@@ -368,180 +425,308 @@ h1 {
 .btn-quiet:focus-visible,
 .seg button:focus-visible,
 .field:focus-visible,
-.link:focus-visible {
+.more:focus-visible,
+.menu-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* The active tab is a 2px underline; everything else in the chrome is grey. */
+/* A segmented track: the range is one row of options, the chosen one a white pill. */
 .seg {
   display: inline-flex;
-  gap: 16px;
-  height: var(--control-height);
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--raised);
 }
 
 .seg button {
-  height: var(--control-height);
-  padding: 0 2px;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+
+.seg button:hover {
+  color: var(--text);
 }
 
 .seg button[aria-pressed='true'] {
-  border-bottom-color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
   color: var(--text);
-  font-weight: 500;
-}
-
-.filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 16px;
 }
 
 .field {
-  height: var(--control-height);
+  height: 32px;
   padding: 0 10px;
   border: 1px solid var(--control);
   border-radius: var(--radius-control);
   background: var(--surface);
-  color: var(--text);
-  font: inherit;
 }
 
 .field::placeholder {
   color: var(--muted);
 }
 
-.link {
+/* "See details →": the one way out of a card, set in ink so it reads as an action. */
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text);
   text-decoration: none;
-  font-size: 13px;
+  transition: color 0.12s;
 }
 
-.link:hover {
-  text-decoration: underline;
+.more svg {
+  transition: transform 0.12s;
 }
 
-/* ---------------- overview grid ---------------- */
+.more:hover {
+  color: var(--accent);
+}
 
-/* 748 + 24 + 384 = 1156, the sheet's content width at 1440. */
-.overview-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 384px;
+.more:hover svg {
+  transform: translateX(2px);
+}
+
+.more-accent {
+  color: var(--accent);
+}
+
+/* ---------------- grids ---------------- */
+
+.stack {
+  display: flex;
+  flex-direction: column;
   gap: var(--gap);
-  align-items: start;
 }
 
-/* With no borders the gap is the separator, so it is larger than any gap inside a
-   section. The grid's 24px gutter still runs between the two columns. */
+.grid {
+  display: grid;
+  gap: var(--gap);
+}
+
+/* Two cards stacked in one cell of a row; the last takes up what the row has left. */
 .column {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: var(--gap);
   min-width: 0;
+}
+
+.column > .card:last-child {
+  flex: 1;
+}
+
+.grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.grid-2-1 {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.grid-1-2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.grid-1-1-1 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid-1-1 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 /* ---------------- cards ---------------- */
 
-/* Frame, sheet, section. The third level is space, not another box: on a white sheet a
-   white card can only exist by its border, and six of them read as a form, not a page. */
 .card {
   display: flex;
   flex-direction: column;
-}
-
-.card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.card-title {
-  font-size: var(--fs-section);
-  font-weight: 500;
-}
-
-.card-note {
-  font-size: var(--fs-small);
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.card-foot {
-  margin-top: 14px;
-}
-
-.chart-note {
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* ---------------- KPI strip: one container, 1px dividers ---------------- */
-
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
 }
 
-.kpi {
-  padding: 16px var(--card-pad);
-  border-left: 1px solid var(--border);
+.card-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px var(--card-pad);
+  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
+  background: var(--band);
+}
+
+.card-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
-.kpi:first-child {
-  border-left: 0;
+.card-title {
+  font-size: var(--fs-section);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.kpi-label {
+.card-aside {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 13px;
-  font-weight: 500;
   color: var(--muted);
+  white-space: nowrap;
 }
 
-/* The mono sets a decimal point wide; at this size "2.4" needs pulling together. */
-.kpi-value {
-  margin-top: 4px;
-  font-size: var(--fs-kpi);
+.card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--card-pad);
+}
+
+/* For a table: the cells carry the side padding so row rules run to the card's edges. */
+.card-body.flush {
+  padding: 4px 0;
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-top: 1px solid var(--rule);
+}
+
+/* The info mark: definitions live here, so the card shows the figure, not the essay. */
+/* The tooltip is placed against the card head, not the mark, so it can never run past
+   the card's own edges, whichever column the card sits in. */
+.info {
+  display: inline-flex;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: help;
+}
+
+.info:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.tip {
+  position: absolute;
+  top: calc(100% - 4px);
+  left: var(--card-pad);
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, calc(100% - 2 * var(--card-pad)));
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--text);
+  color: #fff;
+  font-size: var(--fs-small);
   font-weight: 400;
-  line-height: 1.15;
-  letter-spacing: -0.045em;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  /* It floats over the cards below, so it may carry a shadow. */
+  box-shadow: 0 8px 24px rgba(22, 26, 19, 0.18); /* taste-skill-ignore: a floating tooltip */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s,
+    visibility 0.12s;
+  pointer-events: none;
 }
 
-/* The screen asks whether he is getting fitter, so fitness is the figure that answers it:
-   32 against the siblings' 24, the 1.3 the study's lead figures keep. */
-.kpi-lead .kpi-value {
-  font-size: 32px;
+/* Focus, not only focus-visible: on a phone a tap is the only way to open it. */
+.info:hover .tip,
+.info:focus .tip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
 }
 
-/* The unit stays in the figure's own face: a value never changes typeface mid-line. */
-.kpi-unit {
+/* ---------------- figures ---------------- */
+
+.figure {
+  font-size: var(--fs-kpi);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.figure-sm {
+  font-size: 22px;
+}
+
+.unit {
   margin-left: 4px;
-  font-size: var(--fs-body);
+  font-size: 15px;
+  font-weight: 500;
   letter-spacing: 0;
   color: var(--muted);
 }
 
-.kpi-note {
+.caption {
   margin-top: 6px;
-  font-size: var(--fs-small);
+  font-size: 13px;
   color: var(--muted);
 }
 
-/* Colour says good or bad, not up or down. Fitness falling is bad; fatigue falling is not. */
+.note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Colour says good or bad, never up or down: fitness falling is bad, fatigue falling is not. */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.delta svg {
+  flex: none;
+}
+
 .good {
   color: var(--positive);
 }
@@ -550,72 +735,42 @@ h1 {
   color: var(--negative);
 }
 
-/* ---------------- bare KPI row, for the analytics screen ---------------- */
-
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--gap);
-  margin-bottom: 32px;
-}
-
-.kpi-row .kpi {
-  padding: 0;
-  border: 0;
-}
-
-/* ---------------- sections without cards ---------------- */
-
-.band {
-  margin-bottom: 40px;
-}
-
-.band:last-child {
-  margin-bottom: 0;
-}
-
-.band-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
-}
-
-.band-title {
-  font-size: var(--fs-section);
-  font-weight: 500;
-}
-
-.band-desc {
-  margin-bottom: 16px;
-  font-size: var(--fs-body);
+.even {
   color: var(--muted);
 }
 
-.pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--gap);
-  align-items: start;
-  margin-bottom: 40px;
+/* A KPI: the figure and its caption on the left, its own small picture on the right. */
+.kpi {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
 }
 
-.pair:last-child {
-  margin-bottom: 0;
+.kpi-text {
+  min-width: 0;
 }
 
-/* Inside a pair the grid supplies the rhythm, so the bands keep their own edges. */
-.pair > .band {
-  margin-bottom: 0;
+/* The figure above a chart, with its caption to the right of it on wide cards. */
+.headline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 14px;
+}
+
+.headline .caption {
+  margin-top: 0;
 }
 
 /* ---------------- legend: every swatch is the mark it explains ---------------- */
 
 .legend {
   display: flex;
-  gap: 16px;
   flex-wrap: wrap;
+  gap: 6px 16px;
   font-size: var(--fs-small);
   color: var(--muted);
 }
@@ -640,23 +795,14 @@ table {
 }
 
 th {
-  padding: 0 10px 8px;
+  height: 38px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
   font-size: var(--fs-small);
-  font-weight: 400;
+  font-weight: 500;
   color: var(--muted);
   text-align: left;
   white-space: nowrap;
-  border-bottom: 1px solid var(--border);
-}
-
-th:first-child,
-td:first-child {
-  padding-left: 0;
-}
-
-th:last-child,
-td:last-child {
-  padding-right: 0;
 }
 
 td {
@@ -665,25 +811,58 @@ td {
   border-bottom: 1px solid var(--rule);
 }
 
+td.num {
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+  padding-left: var(--card-pad);
+}
+
+th:last-child,
+td:last-child {
+  padding-right: var(--card-pad);
+}
+
 tbody tr:last-child td {
   border-bottom: 0;
 }
 
+tbody tr {
+  transition: background-color 0.12s;
+}
+
+tbody tr:hover td {
+  background: var(--band);
+}
+
 .num {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .name {
   max-width: 1px;
-  width: 42%;
+  width: 40%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.cell-name {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sub {
+  overflow: hidden;
   font-size: var(--fs-small);
   color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* A missing value is a grey dash, never a zero. */
@@ -691,9 +870,12 @@ tbody tr:last-child td {
   color: var(--muted);
 }
 
-/* The header row stays in view while a long list scrolls, below the sticky top bar.
-   It can only stick to the document, so the table gets a horizontal scroller — which
-   would become its sticky container — no sooner than the width makes one necessary. */
+.date {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* The header row stays in view below the sticky top bar while a long list scrolls. */
 .table-scroll thead th {
   position: sticky;
   top: var(--topbar-height);
@@ -702,11 +884,34 @@ tbody tr:last-child td {
 }
 
 code {
-  font-family: var(--font-figure);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--raised);
   font-size: 0.92em;
 }
 
-/* ---------------- compact rows in the rail ---------------- */
+/* ---------------- pills ---------------- */
+
+.pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--pill-neutral-bg);
+  color: var(--pill-neutral-ink);
+  font-size: var(--fs-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pill-warning {
+  background: var(--pill-warning-bg);
+  color: var(--pill-warning-ink);
+}
+
+/* ---------------- rows ---------------- */
 
 .rows {
   display: flex;
@@ -718,13 +923,22 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 45px;
+  min-height: 46px;
   padding: 6px 0;
   border-bottom: 1px solid var(--rule);
 }
 
+.row:first-child {
+  padding-top: 0;
+}
+
 .row:last-child {
   border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.row-tight {
+  min-height: 34px;
 }
 
 .row-main {
@@ -733,6 +947,7 @@ code {
 
 .row-name {
   overflow: hidden;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -744,63 +959,66 @@ code {
 
 .row-figure {
   flex: none;
+  font-weight: 600;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .row-figure .unit {
-  font-family: var(--font);
   font-size: var(--fs-small);
-  color: var(--muted);
 }
 
-/* ---------------- share rows: the row fill is the bar ---------------- */
+/* ---------------- bar rows: a label, a track, a figure ---------------- */
 
-.share {
+.bars {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 18px;
 }
 
-.share-row {
-  position: relative;
+.bar-row-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  height: 44px;
-  padding: 0 12px;
-  border-radius: var(--radius-card);
+  margin-bottom: 6px;
+}
+
+.bar-row-label {
   overflow: hidden;
-}
-
-.share-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: var(--radius-card);
-  background: var(--raised);
-}
-
-.share-label,
-.share-figures {
-  position: relative;
-}
-
-.share-label {
-  overflow: hidden;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.share-figures {
+.bar-row-figures {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
   flex: none;
+  font-variant-numeric: tabular-nums;
 }
 
-.share-pct {
-  font-size: var(--fs-small);
+.bar-row-figures .share {
+  font-size: 13px;
   color: var(--muted);
+}
+
+.bar-row-figures b {
+  font-weight: 600;
+}
+
+.track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+.track-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--chart-1);
 }
 
 /* ---------------- progress: both ends labelled, the fill the true ratio ---- */
@@ -815,17 +1033,274 @@ code {
   color: var(--muted);
 }
 
-.meter {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--active);
+/* ---------------- gauge, ring and day bars ---------------- */
+
+.gauge {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gauge svg {
+  display: block;
+  max-width: 100%;
+}
+
+.gauge-dial {
+  position: relative;
+}
+
+.gauge-centre {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.gauge-centre .caption {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.gauge-ends {
+  display: flex;
+  justify-content: space-between;
+  width: 280px;
+  max-width: 100%;
+  margin-top: 8px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.ring-block {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.ring {
+  position: relative;
+  flex: none;
+}
+
+.ring svg {
+  display: block;
+}
+
+.ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-bars {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+.day-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.day-bar-track {
+  position: relative;
+  width: 9px;
+  height: 46px;
+  border-radius: 5px;
+  background: var(--accent-100);
   overflow: hidden;
 }
 
-.meter-fill {
-  height: 100%;
-  border-radius: 4px;
+.day-bar-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  border-radius: 5px;
   background: var(--chart-1);
+}
+
+/* Days still to come are drawn as an outline: there is nothing to show yet. */
+.day-bar-track.later {
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.day-bar span {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* ---------------- the load calendar ---------------- */
+
+/* On a card wider than the calendar needs, the summary moves beside it rather than leaving
+   the right half of the card empty. */
+.calendar-body {
+  container-type: inline-size;
+}
+
+@container (min-width: 600px) {
+  .calendar-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+    grid-template-areas:
+      'cal head'
+      'cal legend';
+    align-content: start;
+    column-gap: 40px;
+  }
+
+  .calendar-layout .headline {
+    grid-area: head;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .calendar-layout .calendar {
+    grid-area: cal;
+    grid-row: 1 / span 2;
+  }
+
+  .calendar-layout .calendar-legend {
+    grid-area: legend;
+    align-self: end;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.calendar {
+  display: grid;
+  gap: 4px;
+  max-width: 440px;
+}
+
+.calendar-day {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  align-self: center;
+}
+
+.calendar-cell {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: var(--raised);
+}
+
+.calendar-cell.l1 {
+  background: var(--accent-100);
+}
+
+.calendar-cell.l2 {
+  background: var(--accent-200);
+}
+
+.calendar-cell.l3 {
+  background: var(--accent-300);
+}
+
+.calendar-cell.l4 {
+  background: var(--chart-1);
+}
+
+/* A ride the model cannot measure: the work happened, the load is unknown. The hatch is
+   drawn in --chart-1's value; a custom property cannot reach inside a data URI. */
+.calendar-cell.unmeasured {
+  border: 1px solid var(--chart-1);
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cpath d='M-1 1l2-2M0 4l4-4M3 5l2-2' stroke='%2367a12f' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+}
+
+.calendar-cell.today {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.calendar-cell.later {
+  background: transparent;
+}
+
+.calendar-cell[title] {
+  cursor: default;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 14px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.calendar-legend .steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.calendar-legend .calendar-cell {
+  width: 12px;
+  border-radius: 3px;
+}
+
+/* ---------------- chart hover ---------------- */
+
+.chart {
+  position: relative;
+}
+
+.chart-tip {
+  position: absolute;
+  top: 0;
+  z-index: 4;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(22, 26, 19, 0.1); /* taste-skill-ignore: a floating tooltip */
+  pointer-events: none;
+}
+
+.chart-tip-date {
+  margin-bottom: 4px;
+  color: var(--muted);
+}
+
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tip-row i {
+  display: block;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.chart-tip-row b {
+  margin-left: auto;
+  padding-left: 12px;
+  font-weight: 600;
 }
 
 /* ---------------- states ---------------- */
@@ -833,10 +1308,10 @@ code {
 .state {
   display: flex;
   align-items: center;
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 40px;
+  padding: 10px 12px;
   border: 1px dashed var(--control);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   color: var(--muted);
 }
 
@@ -847,21 +1322,15 @@ code {
   color: var(--pill-negative-ink);
 }
 
-.state-block {
-  grid-column: 1 / -1;
-}
-
-/* The loading state is the final layout with each value replaced by a flat grey bar
-   at its real size, so nothing shifts when the data lands. */
+/* Loading is the final layout with each value a flat grey bar at its real size. */
 .skeleton {
-  border-radius: 3px;
-  background: var(--active);
+  border-radius: 4px;
+  background: var(--raised);
 }
 
 .skeleton-value {
-  height: 24px;
-  width: 64px;
-  margin-top: 4px;
+  width: 72px;
+  height: 30px;
 }
 
 .skeleton-plot {
@@ -873,21 +1342,53 @@ code {
   margin: 15px 0;
 }
 
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0 var(--card-pad);
+}
+
+.pager-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phone-only {
+  display: none;
+}
+
+/* ---------------- between laptop and desktop ---------------- */
+
+@media (max-width: 1280px) {
+  .grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* ---------------- tablet: the frame folds to a top bar ---------------- */
 
 @media (max-width: 1100px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   }
 
   .sidebar {
     position: fixed;
     inset: var(--topbar-height) 0 0 0;
-    z-index: 2;
+    z-index: 10;
     height: auto;
     padding: 8px 16px 16px;
     background: var(--ground);
+    overflow-y: auto;
   }
 
   .sidebar[hidden] {
@@ -898,46 +1399,83 @@ code {
     display: none;
   }
 
-  .topbar,
+  .sidebar .nav-label {
+    margin-top: 8px;
+  }
+
   .sheet {
-    grid-column: 1;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
   }
 
   .topbar {
     padding: 0 16px;
-    gap: 12px;
+    border-radius: 0;
   }
 
   .menu-button {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    height: var(--control-height);
-    padding: 0 8px 0 4px;
-    border: 0;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border: 1px solid var(--border);
     border-radius: var(--radius-control);
-    background: transparent;
-    font-weight: 600;
+    background: var(--surface);
     cursor: pointer;
   }
 
-  .topbar-scope {
-    display: none;
+  .topbar-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    white-space: nowrap;
   }
 
-  .sheet {
-    margin: 0;
-    border-width: 1px 0 0;
-    border-radius: 0;
-    padding: 20px 16px;
+  .search {
+    width: auto;
+    flex: 1;
+    max-width: 320px;
+    margin-left: auto;
   }
 
-  .overview-grid {
+  .topbar-right {
+    margin-left: 0;
+  }
+
+  .page {
+    padding: 24px 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .grid-2-1,
+  .grid-1-2,
+  .grid-1-1 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Below this width the table scrolls in its own frame; the page never scrolls
-     sideways, and the header stops sticking because the scroller would capture it. */
+  .grid-1-1-1 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-1-1-1 > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stamp {
+    display: none;
+  }
+
+  /* Below this width the table scrolls in its own frame; the page never scrolls sideways,
+     and the header stops sticking because the scroller would capture it. */
   .table-scroll {
     overflow-x: auto;
   }
@@ -945,77 +1483,88 @@ code {
   .table-scroll thead th {
     position: static;
   }
-
-  .kpi-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px 24px;
-  }
 }
 
 /* ---------------- phone ---------------- */
 
 @media (max-width: 640px) {
+  :root {
+    --fs-title: 24px;
+    --fs-kpi: 24px;
+    --card-pad: 14px;
+  }
+
+  .search {
+    display: none;
+  }
+
+  .topbar-right {
+    margin-left: auto;
+  }
+
   .title-row {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
   }
 
-  .title-actions {
-    padding-bottom: 0;
+  .grid-4 {
+    gap: 12px;
   }
 
-  .kpis {
+  .grid-6 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .seg {
+    align-self: flex-start;
   }
 
   .kpi {
-    border-left: 0;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  .kpi:nth-child(odd) {
-    border-right: 1px solid var(--border);
-  }
-
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--border);
-  }
-
-  .kpi-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .pair {
+  .grid-1-1-1 {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .card {
-    padding: 16px;
+  .hide-phone {
+    display: none;
   }
 
-  /* The table keeps every column and scrolls inside its own frame, so the page never
-     scrolls sideways. At 560px the twelve columns were about 45px each and the ride
-     names were cut to a single letter, which is the one column that may never be cut. */
+  /* With the other columns folded into its subline, the ride takes the row. */
+  .name {
+    width: 100%;
+  }
+
+  .phone-only {
+    display: block;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar .field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* The table keeps every column and scrolls inside its own frame; the ride name is the
+     one column that may never be cut. */
   .table-scroll table {
     min-width: 880px;
   }
 
-  /* The date stays in view while the figures scroll past it. */
-  /* `top` is reset: the base rule sticks the header 48px down the page, and inheriting
-     that here pushed the first header cell out of its own row and off the screen. */
   .table-scroll th:first-child,
   .table-scroll td:first-child {
     position: sticky;
     top: auto;
     left: 0;
     z-index: 1;
-    padding-right: 12px;
-    white-space: nowrap;
     background: var(--surface);
-  }
-
-  .seg {
-    gap: 12px;
   }
 }
 
