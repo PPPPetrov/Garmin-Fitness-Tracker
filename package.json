@@ -4,6 +4,24 @@
   "private": true,
   "type": "module",
   "description": "Private cycling fitness tracker built on the Garmin Connect Personal API",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PPPPetrov/Garmin-Fitness-Tracker.git"
+  },
+  "homepage": "https://github.com/PPPPetrov/Garmin-Fitness-Tracker#readme",
+  "bugs": {
+    "url": "https://github.com/PPPPetrov/Garmin-Fitness-Tracker/issues"
+  },
+  "keywords": [
+    "garmin",
+    "cycling",
+    "training-load",
+    "fitness",
+    "sqlite",
+    "self-hosted",
+    "fit-files"
+  ],
   "engines": {
     "node": ">=22"
   },

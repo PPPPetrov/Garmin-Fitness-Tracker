@@ -27,7 +27,7 @@ export function BarChart({
   values,
   height = 180,
   yUnit,
-  colour = 'var(--chart-ink)',
+  colour = 'var(--chart-1)',
   xTickEvery,
 }: Props) {
   const [ref, width] = useWidth();
@@ -42,7 +42,7 @@ export function BarChart({
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
   const slot = plotW / values.length;
-  const barW = Math.max(2, Math.min(slot * 0.68, 46));
+  const barW = Math.max(2, Math.min(slot * 0.62, 28));
   const y = (v: number) => padTop + plotH - (v / hi) * plotH;
 
   const every = xTickEvery ?? Math.max(1, Math.ceil(values.length / 6));

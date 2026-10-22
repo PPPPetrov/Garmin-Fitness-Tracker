@@ -1,18 +1,52 @@
 # Garmin Fitness Tracker
 
-A private cycling tracker built on the Garmin Connect Personal API. It imports the whole ride
+A private cycling tracker built on the Garmin Connect Personal API. It imports a whole ride
 history into a local SQLite file and shows how training load, fitness and power records have
 moved over time.
 
-Nothing leaves the machine. There is no account, no hosting and no telemetry.
+Nothing leaves the machine. There is no account, no hosting, no telemetry and no third-party
+service: a Node process talks to Garmin, writes a file on disk, and serves a dashboard to
+`localhost`.
 
-- [`PLAN.md`](PLAN.md) — what is being built and why
-- [`DATA-INVENTORY.md`](DATA-INVENTORY.md) — what the API actually returns for this account,
-  measured rather than assumed, including four undocumented traps
+It is built for one rider's data, but nothing in it is specific to that account — point it at
+your own Personal API key and it will import your history instead.
+
+## What it does
+
+**Imports** every activity and its detail through Garmin's Personal API, handling the
+rate limiter, the token exchange and four undocumented traps in the API (see
+[`docs/data-inventory.md`](docs/data-inventory.md)). Re-running is safe: rides are keyed by
+their Garmin id, so an interrupted import resumes rather than duplicating.
+
+**Optionally downloads the original `.fit` files** for rides with a power meter and extracts
+the peak mean power at thirteen durations from 1 second to 90 minutes. Only the derived curve
+is kept; the files are discarded.
+
+**Models training load** as two exponentially weighted averages of Garmin's
+`activityTrainingLoad` — 42 days for fitness, 7 for fatigue, with form the difference. The
+maths is in [`docs/load-model.md`](docs/load-model.md).
+
+**Tells you where it cannot see.** Two kinds of ride carry a training load the model cannot
+trust: one Garmin gave no load at all, and one recorded without a heart-rate strap, where
+Garmin returns a figure about eight times too low instead of returning nothing. Both are
+counted rather than quietly averaged in, every day within 42 days of one is marked, and the
+dashboard draws those days as open columns rather than solid ones.
+
+**Serves three screens** on `localhost`:
+
+| Screen | The question it answers |
+| --- | --- |
+| Overview | Am I fitter than I was, and how much fatigue am I carrying into today? |
+| Trends | How has the load moved over this period, and what are my best powers? |
+| Activities | Find the ride I am thinking of. |
+
+## Requirements
+
+- Node 22 or newer
+- A Garmin Connect account with cycling activities
+- A Garmin Connect **Personal API key**
 
 ## Setup
-
-Node 22 or newer.
 
 ```bash
 npm install
@@ -25,7 +59,9 @@ shown once, so treat it like a password. Then:
 cp .env.example .env
 ```
 
-and put the key in `GARMIN_PERSONAL_API_KEY`. `.env` is git-ignored; never commit it.
+and put the key in `GARMIN_PERSONAL_API_KEY`. `.env` is git-ignored; never commit it. Every
+setting is listed in [`.env.example`](.env.example) and explained in
+[`docs/architecture.md`](docs/architecture.md#configuration).
 
 ## Importing
 
@@ -33,31 +69,35 @@ and put the key in `GARMIN_PERSONAL_API_KEY`. `.env` is git-ignored; never commi
 npm run sync
 ```
 
-Pulls every activity and its detail. The first run fetches the full history — 423 rides back to
-October 2022 at the time of writing — and pauses when the API rate-limits it, which it will
-roughly five times. Re-running is safe: rides are keyed by their Garmin id, so an interrupted
-import resumes rather than duplicating.
+Pulls every activity and its detail. The first run fetches the full history and pauses when the
+API rate-limits it, which it will roughly once per hundred requests. For a four-year history of
+about 400 rides, expect a few minutes and about five pauses.
 
 ```bash
 npm run sync:fit
 ```
 
-Also downloads the original `.fit` files for rides that have a power meter and extracts the peak
-power at each duration from 1 second to 90 minutes. Only the derived curve is stored; the files
-are discarded. Rides with no power meter are skipped, because there is nothing in them to extract.
+Also downloads the original `.fit` files for rides with a power meter and extracts the power
+curve. Rides with no power meter are skipped, because there is nothing in them to extract.
 
 ```bash
 npm run stats                 # coverage and the current numbers, in the terminal
 npx tsx src/cli.ts recompute  # rebuild the load model without touching the network
 ```
 
-## Running the app
+## Running the dashboard
 
 ```bash
 npm run dev
 ```
 
-The API starts on <http://localhost:8787> and the interface on <http://localhost:5273>.
+The API starts on <http://localhost:8787> and the interface on <http://localhost:5273>. Both
+ports are configurable — set `API_PORT` and `WEB_PORT` in `.env` to run a second checkout
+alongside the first.
+
+Reading an already-imported database needs no Garmin key: the key is only read when something
+actually calls Garmin, so you can browse and develop against an existing `data/garmin.db`
+without one.
 
 ## Tests
 
@@ -66,57 +106,43 @@ npm test          # node:test via tsx
 npm run typecheck
 ```
 
-29 tests over the two parts that are easy to get quietly wrong.
+29 tests over the two parts that are easy to get quietly wrong: the load model and FIT
+handling. What each one pins down is described in
+[`docs/load-model.md`](docs/load-model.md#what-the-tests-pin-down) and
+[`docs/architecture.md`](docs/architecture.md#fit-files).
 
-**The load model** ([`src/calc/load.test.ts`](src/calc/load.test.ts)) — that every calendar day
-gets a row so a rest day is a zero rather than a gap; that fitness and fatigue move by
-`load/42` and `load/7`; that form lags a day; that both decay towards zero through a rest and
-converge on a steady load with fatigue arriving first; that the warm-up and estimated flags
-cover exactly 42 days and that overlapping unmeasured rides leave no clear day between them.
-One test pins the rounding: the series keeps full precision between days and rounds only what
-it stores, which is the difference between a form of −35.71 and −35.72.
+## Documentation
 
-A database test covers the classification itself — a ride with no load, a ride with a load but
-no heart-rate strap, and a short strapless ride that should not be flagged.
+| Document | What is in it |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | How the pieces fit: the import pipeline, the Garmin client, FIT handling, configuration, the layout of the source |
+| [`docs/load-model.md`](docs/load-model.md) | The fitness and fatigue maths, the warm-up window, how unreliable rides are handled, and what the tests pin down |
+| [`docs/data-model.md`](docs/data-model.md) | Every table and column, and why each one exists |
+| [`docs/api.md`](docs/api.md) | The local HTTP API: every endpoint, its parameters and its response shape |
+| [`docs/interface.md`](docs/interface.md) | The dashboard's design system: tokens, type, charts, states and the rules the screens follow |
+| [`docs/data-inventory.md`](docs/data-inventory.md) | What Garmin's Personal API actually returns, measured rather than assumed, including four undocumented traps |
+| [`docs/plan.md`](docs/plan.md) | What is being built and why, and what the data forced the design to change |
 
-**FIT handling** ([`src/sync/fit.test.ts`](src/sync/fit.test.ts)) — the power curve against
-hand-computed peaks, gaps counted as zero watts, windows scaled by the sample rate, and
-durations longer than the ride left out rather than reported as zero. The FIT tests build real
-files with the SDK's `Encoder`, so `parseFit` is exercised end to end, including a ride with no
-power meter.
+## What it deliberately does not do
 
-The ZIP tests build archives by hand, including the streamed variant whose local header reports
-a compressed size of zero. That is a regression test: the real thing failed all 135 downloads.
+- **No wellness data.** Sleep, HRV, Body Battery, stress, steps, resting heart rate and
+  Training Readiness all come back empty for an account whose only device is a bike computer.
+  They are out of scope rather than deferred.
+- **No TSS-based curve.** Only about a third of these rides have a power meter — mountain
+  biking, which is most of the riding, has none — so a TSS curve would read the biggest days
+  as rest. Garmin's heart-rate-derived training load is used instead, because it is present on
+  the whole history.
+- **No recovery claim.** Fitness, fatigue and form are arithmetic over Garmin's load numbers.
+  They describe what you have done, not how recovered you are.
+- **No hosting.** There is no authentication, so do not expose the API port beyond
+  `localhost`.
 
-## How the numbers are built
+## Privacy
 
-Fitness and fatigue are exponentially weighted averages of Garmin's `activityTrainingLoad`, over
-42 and 7 days. Form is fitness minus fatigue. The formula is in [`src/calc/load.ts`](src/calc/load.ts)
-and stated on the page itself.
+`data/` holds the SQLite database, the cached bearer token and any downloaded ride files. The
+whole directory is git-ignored, along with `.env`, `*.key`, `*.fit` and `*.zip`. Nothing is
+sent anywhere except to Garmin's own API, with your own key.
 
-Training load is used rather than TSS because only a third of these rides have a power meter —
-mountain biking, which is most of the riding, has none — so a TSS curve would read the biggest
-days as rest.
+## Licence
 
-Two things are shown as unreliable rather than quietly averaged in:
-
-- a ride Garmin gave no training load;
-- a ride recorded without a heart-rate strap, where Garmin returns a load about eight times too
-  low instead of returning nothing.
-
-Both are counted, and every day within 42 of one is marked, because those days feed the same
-42-day window.
-
-## Layout
-
-```
-src/
-  garmin/     API client: key-to-token exchange, rate-limit backoff, endpoints
-  db/         schema and connection
-  sync/       activity import, FIT download and parsing
-  calc/       the load model and power curve queries
-  server.ts   JSON API
-  cli.ts      sync, stats, recompute
-web/src/      React interface
-data/         SQLite database and token cache (git-ignored)
-```
+MIT. See [`LICENSE`](LICENSE).

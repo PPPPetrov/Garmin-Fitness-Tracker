@@ -8,6 +8,12 @@ export interface Series {
   values: (number | null)[];
 }
 
+export interface Annotation {
+  index: number;
+  value: number;
+  label: string;
+}
+
 interface Props {
   labels: string[];
   series: Series[];
@@ -16,7 +22,9 @@ interface Props {
   xTicks?: number[];
   yUnit?: string;
   /** A 1px dashed horizontal reference, e.g. the zero line for form. */
-  reference?: { value: number; label: string };
+  reference?: { value: number; label?: string };
+  /** The event that matters: a 1px marker and a 12px label in a reserved row above. */
+  annotations?: Annotation[];
 }
 
 /** Round, even steps with the top tick above the maximum. */
@@ -43,12 +51,15 @@ export function LineChart({
   xTicks,
   yUnit,
   reference,
+  annotations = [],
 }: Props) {
   const clipId = useId();
   const [ref, width] = useWidth();
   const padLeft = 46;
   const padRight = 12;
-  const padTop = 10;
+  /* The label row is reserved only when there is a label, so a chart without one has no
+     dead band above it. */
+  const padTop = annotations.length > 0 ? 26 : 10;
   const padBottom = 24;
 
   const all = series.flatMap((s) => s.values).filter((v): v is number => v != null);
@@ -59,6 +70,9 @@ export function LineChart({
   const dataMin = Math.min(...all, reference ? reference.value : Infinity);
   const dataMax = Math.max(...all, reference ? reference.value : -Infinity);
   const { lo, hi, ticks } = niceScale(Math.min(dataMin, 0), dataMax);
+  /* The heavy line is zero wherever zero is on the scale, not the lowest tick: a form
+     chart that crosses zero reads from it, not from its floor. */
+  const baseline = lo < 0 && hi > 0 ? 0 : lo;
 
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
@@ -66,10 +80,13 @@ export function LineChart({
     padLeft + (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW);
   const y = (v: number) => padTop + plotH - ((v - lo) / (hi - lo)) * plotH;
 
+  /* 3 labels on a phone, 4 on a tablet, 6 on a wide plot: they never collide. */
+  const wanted = plotW < 360 ? 3 : plotW < 620 ? 4 : 5;
+  const tickCount = Math.min(wanted, labels.length);
   const tickIndices =
     xTicks ??
-    Array.from({ length: Math.min(6, labels.length) }, (_, k) =>
-      Math.round((k * (labels.length - 1)) / Math.max(1, Math.min(6, labels.length) - 1)),
+    Array.from({ length: tickCount }, (_, k) =>
+      Math.round((k * (labels.length - 1)) / Math.max(1, tickCount - 1)),
     );
 
   /** Straight segments, broken wherever the data is missing rather than interpolated. */
@@ -97,87 +114,128 @@ export function LineChart({
         role="img"
         aria-label={`${series.map((s) => s.name).join(', ')}${yUnit ? ` in ${yUnit}` : ''}`}
       >
-      <defs>
-        <clipPath id={clipId}>
-          <rect x={padLeft} y={padTop} width={plotW} height={plotH} />
-        </clipPath>
-      </defs>
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={padLeft} y={padTop} width={plotW} height={plotH} />
+          </clipPath>
+        </defs>
 
-      {ticks.map((t) => (
-        <g key={t}>
-          <line
-            x1={padLeft}
-            x2={width - padRight}
-            y1={y(t)}
-            y2={y(t)}
-            stroke="var(--grid)"
-            strokeWidth={t === lo ? 2 : 1}
-            vectorEffect="non-scaling-stroke"
-          />
-          <text
-            x={padLeft - 8}
-            y={y(t) + 4}
-            textAnchor="end"
-            fontSize="12"
-            fill="var(--muted)"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {t}
-          </text>
-        </g>
-      ))}
-
-      {reference && (
-        <g>
-          <line
-            x1={padLeft}
-            x2={width - padRight}
-            y1={y(reference.value)}
-            y2={y(reference.value)}
-            stroke="var(--chart-grey)"
-            strokeWidth="1"
-            strokeDasharray="4 4"
-            vectorEffect="non-scaling-stroke"
-          />
-          <text
-            x={width - padRight}
-            y={y(reference.value) - 5}
-            textAnchor="end"
-            fontSize="12"
-            fill="var(--muted)"
-          >
-            {reference.label}
-          </text>
-        </g>
-      )}
-
-      <g clipPath={`url(#${clipId})`}>
-        {series.map((s) => (
-          <path
-            key={s.name}
-            d={path(s.values)}
-            fill="none"
-            stroke={s.colour}
-            strokeWidth={s.width ?? 2}
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={padLeft}
+              x2={width - padRight}
+              y1={y(t)}
+              y2={y(t)}
+              stroke="var(--grid)"
+              strokeWidth={t === baseline ? 2 : 1}
+              vectorEffect="non-scaling-stroke"
+            />
+            <text
+              x={padLeft - 8}
+              y={y(t) + 4}
+              textAnchor="end"
+              fontSize="12"
+              fill="var(--muted)"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {t}
+            </text>
+          </g>
         ))}
-      </g>
 
-      {tickIndices.map((i, k) => (
-        <text
-          key={`${labels[i]}-${i}`}
-          x={x(i)}
-          y={height - 6}
-          textAnchor={k === 0 ? 'start' : k === tickIndices.length - 1 ? 'end' : 'middle'}
-          fontSize="12"
-          fill="var(--muted)"
-        >
-          {labels[i]}
-        </text>
-      ))}
+        {reference && (
+          <g>
+            <line
+              x1={padLeft}
+              x2={width - padRight}
+              y1={y(reference.value)}
+              y2={y(reference.value)}
+              stroke="var(--chart-grey)"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+              vectorEffect="non-scaling-stroke"
+            />
+            {reference.label && (
+              <text
+                x={width - padRight}
+                y={y(reference.value) - 5}
+                textAnchor="end"
+                fontSize="12"
+                fill="var(--muted)"
+              >
+                {reference.label}
+              </text>
+            )}
+          </g>
+        )}
+
+        <g clipPath={`url(#${clipId})`}>
+          {series.map((s) => (
+            <path
+              key={s.name}
+              d={path(s.values)}
+              fill="none"
+              stroke={s.colour}
+              strokeWidth={s.width ?? 2}
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </g>
+
+        {annotations.map((a) => {
+          const ax = x(a.index);
+          /* The label sits on whichever side of its marker leaves it inside the plot. */
+          const anchor = ax > padLeft + plotW * 0.72 ? 'end' : ax < padLeft + plotW * 0.1 ? 'start' : 'middle';
+          return (
+            <g key={a.label}>
+              <line
+                x1={ax}
+                x2={ax}
+                y1={padTop - 8}
+                y2={y(a.value) - 5}
+                stroke="var(--chart-grey)"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+              />
+              <circle cx={ax} cy={y(a.value)} r="3" fill="var(--chart-1)" />
+              <text x={ax} y={padTop - 14} textAnchor={anchor} fontSize="12" fill="var(--muted)">
+                {a.label}
+              </text>
+            </g>
+          );
+        })}
+
+        {tickIndices.map((i, k) => (
+          <text
+            key={`${labels[i]}-${i}`}
+            x={x(i)}
+            y={height - 6}
+            textAnchor={k === 0 ? 'start' : k === tickIndices.length - 1 ? 'end' : 'middle'}
+            fontSize="12"
+            fill="var(--muted)"
+          >
+            {labels[i]}
+          </text>
+        ))}
       </svg>
+    </div>
+  );
+}
+
+/** A dot legend for the card header; each swatch is the line it explains. */
+export function LineLegend({ series }: { series: { name: string; colour: string }[] }) {
+  return (
+    <div className="legend">
+      {series.map((s) => (
+        <span key={s.name}>
+          <svg width="12" height="12" aria-hidden="true">
+            <rect y="5" width="12" height="2" rx="1" fill={s.colour} />
+          </svg>
+          {s.name}
+        </span>
+      ))}
     </div>
   );
 }

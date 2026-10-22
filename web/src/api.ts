@@ -54,6 +54,14 @@ export interface Status {
   timeZone: string;
 }
 
+export interface RideType {
+  activity_type: string;
+  n: number;
+  powered: number;
+  no_load: number;
+  no_strap: number;
+}
+
 export interface PowerPoint {
   duration_s: number;
   watts: number;

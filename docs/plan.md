@@ -3,8 +3,8 @@
 Updated: 22 October 2026
 Status: API access proven, data inventoried. Ready to build.
 
-Supersedes the original planning draft, kept as `PLAN-original-chatgpt.md`.
-Every factual claim here is backed by `DATA-INVENTORY.md`, which records live responses
+Supersedes the original planning draft, kept as [`plan-original-draft.md`](plan-original-draft.md).
+Every factual claim here is backed by [`data-inventory.md`](data-inventory.md), which records live responses
 from Peter's account rather than documentation.
 
 ## Purpose
@@ -107,7 +107,7 @@ Daily grouping uses the activity's local date in `Europe/Athens`.
 ### 1. Prove access and inventory the data — done
 
 Token exchange, endpoint surface, history reach, field coverage, FIT contents and two
-undocumented gotchas are recorded in `DATA-INVENTORY.md`. The API key is in `.env`, git-ignored.
+undocumented gotchas are recorded in [`data-inventory.md`](data-inventory.md). The API key is in `.env`, git-ignored.
 
 ### 2. Storage and a complete backfill
 
@@ -173,4 +173,4 @@ fitness score.
 - [Personal API overview](https://developer.garmin.com/gc-developer-program/personal/personal-api/)
 - [Personal API FAQ](https://developer.garmin.com/gc-developer-program/personal/personal-faq/)
 - [garmin/connect-personal-api-python](https://github.com/garmin/connect-personal-api-python) — authoritative endpoint list
-- `DATA-INVENTORY.md` — what this account actually returns
+- [`data-inventory.md`](data-inventory.md) — what this account actually returns
