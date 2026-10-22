@@ -181,22 +181,46 @@ Still open: the bpm boundaries behind the zones. They need
 `/biometric-service/heartRateZones/v2` from **B** below, so the rows are labelled "Zone 1" … 
 "Zone 5" rather than by heart rate.
 
-**A2 — Short-duration power without a FIT download.** `maxAvgPower_1, _2, _5, _10, _20, _30,
-_60, _120, _300` are populated on **all 135 powered rides**. The project spends a ~335 MB FIT
-download to derive durations the list response already carries up to five minutes. FIT is still
-required for 600 s and above.
+**A2 — Garmin's own peak power, as a check on ours. Built 22 October 2026.** The list
+response carries `maxAvgPower_{seconds}` far past the five minutes first noted here: 1 s to
+300 s on all 135 powered rides, then 600 s and 1200 s on 134, 1800 s on 125 and 3600 s on 104 —
+whatever the ride was long enough to hold. Eleven of our thirteen durations have a Garmin
+figure beside them; only 15 s and 5400 s do not. FIT is therefore not needed for any duration
+up to an hour, but it stays the source, because the point is to check the parser, not to
+replace it.
 
-Worth more than the saving: these are nine Garmin-computed figures per ride to check the parser
-against, where [`data-inventory.md`](data-inventory.md) currently verifies one ride at one
-duration. Run as a cross-check on 22 October 2026, **133 of 135 rides agreed within 1 %**.
+*Built as* [`src/sync/powerCheck.ts`](../src/sync/powerCheck.ts): every stored curve is
+compared with Garmin's figures at each shared duration, with a tolerance of 1 % or 2 W,
+whichever is larger. A ride that disagrees goes back to `pending` in `fit_file`, with the
+worst duration as the reason, and the records leave it out until a FIT sync parses it again.
+Overview and Trends say how many rides are held back. It runs after every FIT sync, and on its
+own with `npx tsx src/cli.ts verify-power`, which needs no network.
 
-**A3 — Known defect, found by that cross-check.** [`src/sync/fit.ts`](../src/sync/fit.ts) infers
-the sample rate from the gap between the **first two records only**, and `computePowerCurve`
-sizes its window in samples rather than walking timestamps. A ride opening with a pause has its
-whole stream mis-scaled. Ride `#22736415876` (2 May 2026, first gap 26 s) reports 476 W for one
-minute against Garmin's 222 W, and **holds the all-time record at 60 s, 120 s, 300 s and 600 s** —
-so four of the thirteen figures in "Best power held" are inflated. Two other rides are out by
-28 % and 19 %. Deferred by Peter on 22 October 2026, not disputed.
+First run, on the curves the old parser stored: **127 of 135 agree, 8 do not**. Three were
+known from the five-minute check; the other five disagree only at 10 min to an hour, which
+that check could not see. In all eight our figure is the higher one — the signature of A3,
+where counting records closes up the pauses inside a window.
+
+**A3 — Sample-rate defect. Fixed 22 October 2026.** [`src/sync/fit.ts`](../src/sync/fit.ts)
+inferred the sample rate from the gap between the first two records only and sized every
+window in records. Ride `#22736415876` opened with a 26 s pause, so a one-minute window
+covered two records; it held the all-time record at 60 s, 120 s, 300 s and 600 s.
+
+The parser now lays the readings on a one-second grid by timestamp (`toSecondStream`). Each
+reading stands for one interval of the file's own recording rate — the commonest gap between
+records — and a longer gap is zero watts. Holding a reading longer was tried and rejected: it
+turns a pause after a hard pedal stroke into seconds of that power, which is the same
+inflation in a new place.
+
+With a new API key the same evening, the eight were downloaded again and parsed with the
+new code: **all 135 rides now agree with Garmin**. The four records read 424 W, 371 W, 315 W
+and 265 W, from 476, 432, 344 and 268.5. The five-minute record rose again once its ride
+(`#24046432641`, Garmin's own 315 W) came back in.
+
+Still open, and optional: the other 127 curves were made by the old parser and agree only
+because their files happened to have no pauses that mattered. Re-parsing them with the new
+code would confirm it on the whole history; their files are not on disk, so it costs 127
+downloads once, and nothing after that.
 
 **A4 — Minor, take only if a screen needs them.** Route start and end coordinates (360 rides),
 min/max elevation and max vertical speed (362), min/max temperature (381), max speed (420),
@@ -252,8 +276,8 @@ from, so a number on screen can always be traced back to the rides behind it.
   138 km ride).
 - Re-run an import, interrupt one, edit a ride in Connect, and let a token expire.
 - Check the DST boundaries in `Europe/Athens` and the 2022 history edge.
-- Verify the power curve against `maxPowerTwentyMinutes`, the one duration Garmin gives us to
-  check against.
+- Verify the power curve against Garmin's `maxAvgPower_*` figures, eleven durations per ride:
+  `npx tsx src/cli.ts verify-power`.
 - Confirm the key and tokens never reach the browser bundle or any log.
 
 ## Out of scope

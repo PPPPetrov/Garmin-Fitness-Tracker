@@ -225,6 +225,9 @@ export function loadCoverage(): {
  * Both bounds are optional, and a season is compared with the same span of the season
  * before it: a peak held over ten months against one held over twelve is not a
  * comparison, it is a longer dice roll.
+ *
+ * Only rides whose file is `parsed` count. One the Garmin cross-check flagged is back
+ * to `pending`, and a record it holds would be a parser fault, not an effort.
  */
 export function bestPowerCurve(
   sinceDate?: string,
@@ -242,11 +245,13 @@ export function bestPowerCurve(
       `SELECT p.duration_s, p.watts, p.activity_id, a.local_date
          FROM power_curve p
          JOIN activity a ON a.activity_id = p.activity_id
+         JOIN fit_file f ON f.activity_id = p.activity_id AND f.status = 'parsed'
         WHERE (? IS NULL OR a.local_date >= ?)
           AND (? IS NULL OR a.local_date <= ?)
           AND p.watts = (
             SELECT MAX(p2.watts) FROM power_curve p2
             JOIN activity a2 ON a2.activity_id = p2.activity_id
+            JOIN fit_file f2 ON f2.activity_id = p2.activity_id AND f2.status = 'parsed'
             WHERE p2.duration_s = p.duration_s
               AND (? IS NULL OR a2.local_date >= ?)
               AND (? IS NULL OR a2.local_date <= ?)
@@ -260,4 +265,22 @@ export function bestPowerCurve(
     activity_id: number;
     local_date: string;
   }[];
+}
+
+/** Rides in the range that have a power curve on file but are left out of the records. */
+export function powerCurveHeldBack(sinceDate?: string, untilDate?: string): number {
+  const since = sinceDate ?? null;
+  const until = untilDate ?? null;
+  const row = db()
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM fit_file f
+         JOIN activity a ON a.activity_id = f.activity_id
+        WHERE f.status <> 'parsed'
+          AND EXISTS (SELECT 1 FROM power_curve p WHERE p.activity_id = f.activity_id)
+          AND (? IS NULL OR a.local_date >= ?)
+          AND (? IS NULL OR a.local_date <= ?)`,
+    )
+    .get(since, since, until, until) as { n: number };
+  return row.n;
 }

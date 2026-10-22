@@ -1,10 +1,11 @@
 import { Decoder, Stream } from '@garmin/fitsdk';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { downloadActivityFile } from '../garmin/client.js';
+import { verifyPowerCurves, type PowerCheckResult } from './powerCheck.js';
 
 /**
  * Durations we keep a peak-mean-power value for.
@@ -30,32 +31,70 @@ export interface ParsedFit {
 }
 
 /**
- * Best average power over each window, by sliding sum.
+ * Lay power readings out on a one-second grid by their timestamps.
+ *
+ * Each reading stands for `holdSeconds` — the file's own recording interval — or until
+ * the next reading, whichever is sooner. A longer gap is a pause or a lost sensor, and
+ * counts as zero watts rather than having the reading before it stretched across it.
+ * Windows are then measured in seconds of the ride, not in records, so a pause can
+ * neither stretch nor squeeze them.
+ */
+export function toSecondStream(
+  samples: { seconds: number; watts: number }[],
+  holdSeconds = 1,
+): number[] {
+  const last = samples.at(-1);
+  if (!last) return [];
+
+  const hold = Math.max(1, Math.round(holdSeconds));
+  const stream = new Array<number>(Math.floor(last.seconds) + hold).fill(0);
+  samples.forEach((sample, i) => {
+    const from = Math.floor(sample.seconds);
+    const next = samples[i + 1];
+    const until = Math.min(next ? Math.floor(next.seconds) : Infinity, from + hold);
+    for (let t = from; t < until; t++) stream[t] = sample.watts;
+  });
+  return stream;
+}
+
+/**
+ * Best average power over each window, by sliding sum over a one-second stream.
  *
  * Gaps in the power stream count as zero watts rather than being skipped, which is
  * the conservative reading: a coasting second really was zero watts at the pedals.
  */
-export function computePowerCurve(
-  power: number[],
-  sampleRateSeconds: number,
-): Map<number, number> {
+export function computePowerCurve(perSecond: number[]): Map<number, number> {
   const curve = new Map<number, number>();
 
-  for (const duration of POWER_CURVE_DURATIONS) {
-    const window = Math.max(1, Math.round(duration / sampleRateSeconds));
-    if (window > power.length) continue;
+  for (const window of POWER_CURVE_DURATIONS) {
+    if (window > perSecond.length) continue;
 
     let sum = 0;
     let best = 0;
-    for (let i = 0; i < power.length; i++) {
-      sum += power[i] ?? 0;
-      if (i >= window) sum -= power[i - window] ?? 0;
+    for (let i = 0; i < perSecond.length; i++) {
+      sum += perSecond[i] ?? 0;
+      if (i >= window) sum -= perSecond[i - window] ?? 0;
       if (i >= window - 1) best = Math.max(best, sum / window);
     }
-    curve.set(duration, Math.round(best * 10) / 10);
+    curve.set(window, Math.round(best * 10) / 10);
   }
 
   return curve;
+}
+
+/** The commonest gap between records, in seconds: the rate the file was recorded at. */
+function typicalGapSeconds(times: number[]): number {
+  const counts = new Map<number, number>();
+  for (let i = 1; i < times.length; i++) {
+    const gap = Math.round((times[i]! - times[i - 1]!) / 1000);
+    if (gap > 0) counts.set(gap, (counts.get(gap) ?? 0) + 1);
+  }
+  let typical = 1;
+  let most = 0;
+  for (const [gap, count] of counts) {
+    if (count > most) [typical, most] = [gap, count];
+  }
+  return typical;
 }
 
 export function parseFit(buffer: Buffer): ParsedFit {
@@ -69,19 +108,25 @@ export function parseFit(buffer: Buffer): ParsedFit {
   const records = messages.recordMesgs ?? [];
   if (records.length === 0) throw new Error('FIT file has no record messages');
 
-  const first = records[0]?.timestamp;
-  const second = records[1]?.timestamp;
-  const sampleRateSeconds =
-    first && second ? Math.max(1, (second.getTime() - first.getTime()) / 1000) : 1;
-
-  const power = records.map((r) => r.power ?? 0);
+  const timed = records.filter((r): r is FitRecord & { timestamp: Date } => r.timestamp != null);
+  const times = timed.map((r) => r.timestamp.getTime());
+  const start = times[0] ?? 0;
   const powerRecords = records.filter((r) => r.power != null).length;
+  const sampleRateSeconds = typicalGapSeconds(times);
 
   return {
     recordCount: records.length,
     powerRecords,
     sampleRateSeconds,
-    powerCurve: powerRecords > 0 ? computePowerCurve(power, sampleRateSeconds) : new Map(),
+    powerCurve:
+      powerRecords > 0
+        ? computePowerCurve(
+            toSecondStream(
+              timed.map((r, i) => ({ seconds: (times[i]! - start) / 1000, watts: r.power ?? 0 })),
+              sampleRateSeconds,
+            ),
+          )
+        : new Map(),
   };
 }
 
@@ -167,8 +212,11 @@ function mark(
 
 export interface FitSyncResult {
   downloaded: number;
+  /** Parsed again from a file already on disk, with no request. */
+  reparsed: number;
   skipped: number;
   failed: number;
+  check: PowerCheckResult;
 }
 
 /**
@@ -176,13 +224,19 @@ export interface FitSyncResult {
  *
  * Rides without power are marked `skipped`: there is no power curve to extract, and
  * at ~800 KB each there is no reason to hold the file.
+ *
+ * Files are kept by default, so a change to the parser costs a re-read of the disk
+ * rather than 135 downloads on a key that can be revoked. A ride already on disk is
+ * parsed from there. Every curve is then checked against Garmin's own figures, and
+ * one that disagrees goes back to `pending`.
  */
 export async function syncFitFiles(
   options: { onProgress?: (message: string) => void; keepFiles?: boolean } = {},
 ): Promise<FitSyncResult> {
   const database = db();
   const log = options.onProgress ?? (() => {});
-  const result: FitSyncResult = { downloaded: 0, skipped: 0, failed: 0 };
+  const keepFiles = options.keepFiles ?? true;
+  const result: Omit<FitSyncResult, 'check'> = { downloaded: 0, reparsed: 0, skipped: 0, failed: 0 };
 
   const pending = database
     .prepare(
@@ -203,8 +257,9 @@ export async function syncFitFiles(
   }
 
   log(`  ${withPower.length} powered rides to fetch, ${result.skipped} skipped (no power meter)`);
-  if (options.keepFiles) mkdirSync(config.fitCachePath, { recursive: true });
+  if (keepFiles) mkdirSync(config.fitCachePath, { recursive: true });
 
+  const clearCurve = database.prepare('DELETE FROM power_curve WHERE activity_id = ?');
   const insertPoint = database.prepare(
     `INSERT INTO power_curve (activity_id, duration_s, watts) VALUES (?, ?, ?)
      ON CONFLICT(activity_id, duration_s) DO UPDATE SET watts = excluded.watts`,
@@ -212,14 +267,17 @@ export async function syncFitFiles(
 
   for (const [index, row] of withPower.entries()) {
     try {
-      const zip = await downloadActivityFile(row.activity_id);
-      const fit = extractFitFromZip(zip);
-      if (options.keepFiles) {
-        writeFileSync(join(config.fitCachePath, `${row.activity_id}.fit`), fit);
-      }
+      const cached = join(config.fitCachePath, `${row.activity_id}.fit`);
+      const onDisk = existsSync(cached);
+      const fit = onDisk
+        ? readFileSync(cached)
+        : extractFitFromZip(await downloadActivityFile(row.activity_id));
+      if (keepFiles && !onDisk) writeFileSync(cached, fit);
 
       const parsed = parseFit(fit);
       database.transaction(() => {
+        // A durations list that shrinks must not leave the old parse's points behind.
+        clearCurve.run(row.activity_id);
         for (const [duration, watts] of parsed.powerCurve) {
           insertPoint.run(row.activity_id, duration, watts);
         }
@@ -231,7 +289,8 @@ export async function syncFitFiles(
         power_records: parsed.powerRecords,
         sample_rate_s: parsed.sampleRateSeconds,
       });
-      result.downloaded++;
+      if (onDisk) result.reparsed++;
+      else result.downloaded++;
     } catch (error) {
       mark(row.activity_id, 'failed', {
         error: error instanceof Error ? error.message : String(error),
@@ -242,5 +301,5 @@ export async function syncFitFiles(
     if ((index + 1) % 10 === 0) log(`  fit ${index + 1}/${withPower.length}`);
   }
 
-  return result;
+  return { ...result, check: verifyPowerCurves() };
 }

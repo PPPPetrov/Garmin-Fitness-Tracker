@@ -107,6 +107,12 @@ export interface PowerPoint {
   local_date: string;
 }
 
+export interface PowerCurve {
+  rows: PowerPoint[];
+  /** Rides in range whose file disagreed with Garmin's own figures, so left out of `rows`. */
+  heldBack: number;
+}
+
 /** One calendar year, counted only as far into it as today is. */
 export interface Season {
   year: number;

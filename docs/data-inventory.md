@@ -152,10 +152,15 @@ Derived power curve from that file:
 | --- | --- | --- | --- | --- | --- |
 | 563 W | 404 W | 366 W | 215 W | **190 W** | 149 W |
 
-The 20 min figure matches `summaryDTO.maxPowerTwentyMinutes` (190.043) — the FIT parse is correct.
+The 20 min figure matches `summaryDTO.maxPowerTwentyMinutes` (190.043). That is one ride at
+one duration, and it did not catch a parser defect that the wider check below found.
 
-**The summary gives only the 20-minute peak.** Every other duration requires the FIT file.
-Full history at ~793 KB per ride ≈ **335 MB**.
+**The detail summary gives only the 20-minute peak, but the list response gives more.**
+Measured 22 October 2026: `maxAvgPower_1, _2, _5, _10, _20, _30, _60, _120, _300` on all 135
+powered rides, `_600` and `_1200` on 134, `_1800` on 125, `_3600` on 104, `_7200` on 53 and
+`_18000` on 16 — present when the ride is long enough to hold the duration. The FIT file is
+still the project's source for the curve; these are what it is checked against. Full history
+at ~793 KB per ride ≈ **335 MB**.
 
 ## What the account does NOT contain
 

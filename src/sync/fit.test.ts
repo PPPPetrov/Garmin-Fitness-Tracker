@@ -2,7 +2,13 @@ import { Encoder, Profile, type Encodable, type FileIdMesg, type RecordMesg } fr
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { crc32, deflateRawSync } from 'node:zlib';
-import { computePowerCurve, extractFitFromZip, parseFit, POWER_CURVE_DURATIONS } from './fit.js';
+import {
+  computePowerCurve,
+  extractFitFromZip,
+  parseFit,
+  POWER_CURVE_DURATIONS,
+  toSecondStream,
+} from './fit.js';
 
 // ---------------------------------------------------------------- zip fixtures
 
@@ -72,8 +78,12 @@ function makeZip(name: string, contents: Buffer, options: ZipOptions = {}): Buff
 const FILE_ID = Profile.MesgNum.FILE_ID as number;
 const RECORD = Profile.MesgNum.RECORD as number;
 
-/** Encode a real FIT file whose record messages carry the given power values. */
-function makeFit(power: (number | null)[], sampleRateSeconds = 1): Buffer {
+/**
+ * Encode a real FIT file whose record messages carry the given power values.
+ * `offsets`, when given, are each record's seconds from the start, for files that do
+ * not record at a steady rate.
+ */
+function makeFit(power: (number | null)[], sampleRateSeconds = 1, offsets?: number[]): Buffer {
   const encoder = new Encoder();
   const start = new Date('2026-01-01T06:00:00Z');
 
@@ -90,7 +100,7 @@ function makeFit(power: (number | null)[], sampleRateSeconds = 1): Buffer {
   power.forEach((watts, i) => {
     const record: Encodable<RecordMesg> = {
       mesgNum: RECORD,
-      timestamp: new Date(start.getTime() + i * sampleRateSeconds * 1000),
+      timestamp: new Date(start.getTime() + (offsets?.[i] ?? i * sampleRateSeconds) * 1000),
       heartRate: 140,
       cadence: 85,
       // A record with no power field is how a ride without a meter actually looks.
@@ -108,7 +118,7 @@ describe('computePowerCurve', () => {
   it('finds the best average over each window', () => {
     // A quiet ride with one 5-second effort in the middle.
     const power = [...Array(20).fill(100), ...Array(5).fill(500), ...Array(20).fill(100)];
-    const curve = computePowerCurve(power, 1);
+    const curve = computePowerCurve(power);
 
     assert.equal(curve.get(1), 500);
     assert.equal(curve.get(5), 500);
@@ -118,12 +128,12 @@ describe('computePowerCurve', () => {
   });
 
   it('reports the same value at every duration for a constant effort', () => {
-    const curve = computePowerCurve(Array(4000).fill(220), 1);
+    const curve = computePowerCurve(Array(4000).fill(220));
     for (const [, watts] of curve) assert.equal(watts, 220);
   });
 
   it('leaves out durations longer than the ride', () => {
-    const curve = computePowerCurve(Array(100).fill(200), 1);
+    const curve = computePowerCurve(Array(100).fill(200));
 
     assert.equal(curve.has(60), true);
     assert.equal(curve.has(300), false);
@@ -132,26 +142,52 @@ describe('computePowerCurve', () => {
 
   it('treats a gap in the stream as zero watts, because coasting really is zero', () => {
     const withGap = [...Array(5).fill(400), ...Array(5).fill(0)];
-    const curve = computePowerCurve(withGap, 1);
+    const curve = computePowerCurve(withGap);
 
     assert.equal(curve.get(5), 400);
     assert.equal(curve.get(10), 200);
   });
 
-  it('scales the window by the sample rate', () => {
-    // Recorded every two seconds: a 60s window is 30 samples, not 60.
-    const power = [...Array(30).fill(300), ...Array(30).fill(0)];
-    const curve = computePowerCurve(power, 2);
-
-    assert.equal(curve.get(60), 300);
-    assert.equal(curve.get(120), 150);
-  });
-
   it('returns zeros rather than NaN for a ride of pure coasting', () => {
-    const curve = computePowerCurve(Array(100).fill(0), 1);
+    const curve = computePowerCurve(Array(100).fill(0));
 
     assert.equal(curve.get(10), 0);
     assert.ok([...curve.values()].every(Number.isFinite));
+  });
+});
+
+describe('toSecondStream', () => {
+  it('passes a steady one-second recording through unchanged', () => {
+    const samples = [100, 200, 300].map((watts, seconds) => ({ seconds, watts }));
+    assert.deepEqual(toSecondStream(samples), [100, 200, 300]);
+  });
+
+  it('holds each reading for one interval on a slower recording', () => {
+    const samples = [300, 100].map((watts, i) => ({ seconds: i * 2, watts }));
+    assert.deepEqual(toSecondStream(samples, 2), [300, 300, 100, 100]);
+  });
+
+  /**
+   * The defect behind ride #22736415876: it opened with a 26-second pause, and the
+   * old parser took that first gap as the sample rate for the whole ride, so a
+   * one-minute window covered two samples. A gap is time, and only time.
+   */
+  it('turns a long gap into zero watts instead of stretching the reading across it', () => {
+    const samples = [
+      { seconds: 0, watts: 400 },
+      { seconds: 26, watts: 200 },
+      { seconds: 27, watts: 200 },
+    ];
+    const stream = toSecondStream(samples);
+
+    assert.equal(stream.length, 28);
+    assert.equal(stream.filter((w) => w === 400).length, 1);
+    assert.equal(stream.filter((w) => w === 0).length, 25);
+    assert.equal(toSecondStream(samples, 2).filter((w) => w === 400).length, 2);
+  });
+
+  it('returns nothing for no samples', () => {
+    assert.deepEqual(toSecondStream([]), []);
   });
 });
 
@@ -207,7 +243,7 @@ describe('parseFit', () => {
 
     assert.equal(parsed.powerCurve.get(60), 350);
     assert.equal(parsed.powerCurve.get(120), 250);
-    assert.deepEqual(parsed.powerCurve.get(60), computePowerCurve(power, 1).get(60));
+    assert.deepEqual(parsed.powerCurve.get(60), computePowerCurve(power).get(60));
   });
 
   it('detects a slower sample rate and sizes the windows to it', () => {
@@ -215,6 +251,32 @@ describe('parseFit', () => {
 
     assert.equal(parsed.sampleRateSeconds, 2);
     assert.equal(parsed.powerCurve.get(120), 200);
+  });
+
+  it('measures windows in seconds when the ride opens with a pause', () => {
+    // One sample, a 26-second pause, then ten minutes at 200 W. Read as a 26-second
+    // sample rate, the old parser made every minute window two samples wide.
+    const power = [800, ...Array(600).fill(200)];
+    const offsets = [0, ...Array.from({ length: 600 }, (_, i) => 26 + i)];
+    const parsed = parseFit(makeFit(power, 1, offsets));
+
+    assert.equal(parsed.sampleRateSeconds, 1);
+    assert.equal(parsed.powerCurve.get(60), 200);
+    assert.equal(parsed.powerCurve.get(300), 200);
+  });
+
+  it('does not close up a recording gap in the middle of a ride', () => {
+    // Two minutes at 300 W either side of a five-minute stop. Counting samples
+    // would join them into four unbroken minutes.
+    const power = [...Array(120).fill(300), ...Array(120).fill(300)];
+    const offsets = [
+      ...Array.from({ length: 120 }, (_, i) => i),
+      ...Array.from({ length: 120 }, (_, i) => 420 + i),
+    ];
+    const parsed = parseFit(makeFit(power, 1, offsets));
+
+    assert.equal(parsed.powerCurve.get(120), 300);
+    assert.ok((parsed.powerCurve.get(300) ?? Infinity) < 300);
   });
 
   it('gives an empty curve, not zeros, for a ride with no power meter', () => {

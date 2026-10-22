@@ -145,3 +145,11 @@ export function isoDaysAgo(daysAgo: number): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${month}-${day}`;
 }
+
+/** Why a power record may be missing a ride. Empty when none is held back. */
+export function heldBackNote(rides: number): string {
+  if (rides === 0) return '';
+  return rides === 1
+    ? "1 ride is left out: its file disagrees with Garmin's own figures, and it returns once a FIT sync parses it again."
+    : `${rides} rides are left out: their files disagree with Garmin's own figures, and they return once a FIT sync parses them again.`;
+}

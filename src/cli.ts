@@ -2,6 +2,7 @@ import { bestPowerCurve, loadCoverage, recomputeDailyLoad } from './calc/load.js
 import { closeDb, db } from './db/index.js';
 import { setThrottleListener } from './garmin/client.js';
 import { syncFitFiles } from './sync/fit.js';
+import { verifyPowerCurves, type PowerCheckResult } from './sync/powerCheck.js';
 import { backfillFromRaw, syncActivities } from './sync/import.js';
 
 const log = (message: string) => process.stdout.write(message + '\n');
@@ -11,7 +12,7 @@ setThrottleListener((seconds) => log(`  rate limited, waiting ${seconds}s`));
 async function commandSync(args: string[]): Promise<void> {
   const incremental = args.includes('--incremental');
   const withFit = args.includes('--fit');
-  const keepFiles = args.includes('--keep-files');
+  const keepFiles = !args.includes('--discard-files');
 
   log(`Syncing activities (${incremental ? 'incremental' : 'full'})...`);
   const result = await syncActivities({ incremental, onProgress: log });
@@ -24,12 +25,29 @@ async function commandSync(args: string[]): Promise<void> {
   if (withFit) {
     log('Downloading FIT files for powered rides...');
     const fit = await syncFitFiles({ onProgress: log, keepFiles });
-    log(`  ${fit.downloaded} parsed, ${fit.skipped} skipped, ${fit.failed} failed`);
+    log(
+      `  ${fit.downloaded} downloaded, ${fit.reparsed} parsed from disk, ` +
+        `${fit.skipped} skipped, ${fit.failed} failed`,
+    );
+    logPowerCheck(fit.check);
   }
 
   log('Recomputing load model...');
   const load = recomputeDailyLoad();
   if (load) log(`  ${load.days} days from ${load.from} to ${load.to}`);
+}
+
+function logPowerCheck(check: PowerCheckResult): void {
+  log(
+    `  power curves against Garmin's figures: ${check.agreed} agree, ` +
+      `${check.flagged.length} disagree, ${check.unverifiable} with nothing to check`,
+  );
+  for (const ride of check.flagged) {
+    log(`    #${ride.activity_id} ${ride.local_date}  ${ride.reason}`);
+  }
+  if (check.flagged.length > 0) {
+    log('  Those rides are left out of the power records until a FIT sync parses them again.');
+  }
 }
 
 function commandStats(): void {
@@ -136,11 +154,16 @@ async function main(): Promise<void> {
         log(`Read ${filled.rides} stored list payloads; ${filled.withZones} carried heart-rate zones`);
         break;
       }
+      case 'verify-power':
+        log("Checking stored power curves against Garmin's figures...");
+        logPowerCheck(verifyPowerCurves());
+        break;
       default:
-        log('Usage: npm run sync [-- --fit --incremental --keep-files]');
+        log('Usage: npm run sync [-- --fit --incremental --discard-files]');
         log('       npm run stats');
         log('       npx tsx src/cli.ts recompute');
         log('       npx tsx src/cli.ts backfill   # promote stored fields, no network');
+        log('       npx tsx src/cli.ts verify-power   # check power curves, no network');
         process.exitCode = 1;
     }
   } finally {

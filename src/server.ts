@@ -5,7 +5,13 @@ import {
   CONFIDENCE_WINDOW_DAYS,
   currentFormPosition,
 } from './calc/form.js';
-import { bestPowerCurve, loadCoverage, recomputeDailyLoad, today } from './calc/load.js';
+import {
+  bestPowerCurve,
+  loadCoverage,
+  powerCurveHeldBack,
+  recomputeDailyLoad,
+  today,
+} from './calc/load.js';
 import { zonesInRange } from './calc/zones.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
@@ -190,7 +196,9 @@ app.get('/api/activities/:id', (c) => {
 });
 
 app.get('/api/power-curve', (c) => {
-  return c.json({ rows: bestPowerCurve(c.req.query('since'), c.req.query('to')) });
+  const since = c.req.query('since');
+  const to = c.req.query('to');
+  return c.json({ rows: bestPowerCurve(since, to), heldBack: powerCurveHeldBack(since, to) });
 });
 
 /**
