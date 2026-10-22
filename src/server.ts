@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
-import { bestPowerCurve, loadCoverage, recomputeDailyLoad } from './calc/load.js';
+import { bestPowerCurve, loadCoverage, recomputeDailyLoad, today } from './calc/load.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
 import { syncActivities } from './sync/import.js';
@@ -171,7 +171,51 @@ app.get('/api/activities/:id', (c) => {
 });
 
 app.get('/api/power-curve', (c) => {
-  return c.json({ rows: bestPowerCurve(c.req.query('since')) });
+  return c.json({ rows: bestPowerCurve(c.req.query('since'), c.req.query('to')) });
+});
+
+/**
+ * Every calendar year, counted only as far into it as today is, so a season in progress
+ * is held against the same ten months of the season before rather than a whole one.
+ */
+app.get('/api/seasons', (c) => {
+  const throughMonthDay = today().slice(5);
+  const rows = db()
+    .prepare(
+      `SELECT CAST(strftime('%Y', local_date) AS INTEGER) AS year,
+              COUNT(*) AS rides,
+              ROUND(SUM(COALESCE(duration_s,0))/3600.0, 1) AS hours,
+              ROUND(SUM(COALESCE(distance_m,0))/1000.0) AS km,
+              ROUND(SUM(COALESCE(elevation_gain_m,0))) AS elevation_m,
+              ROUND(SUM(COALESCE(activity_training_load,0))) AS load_points
+         FROM activity
+        WHERE strftime('%m-%d', local_date) <= ?
+        GROUP BY year ORDER BY year DESC`,
+    )
+    .all(throughMonthDay);
+  return c.json({ throughMonthDay, rows });
+});
+
+/**
+ * The dated steps in Garmin's own threshold estimate. Every powered ride carries the FTP
+ * in effect on its date, so the history is already in the activity table; this reduces it
+ * to the days the figure actually changed.
+ */
+app.get('/api/ftp', (c) => {
+  const rides = db()
+    .prepare(
+      `SELECT local_date, ftp_at_ride AS watts FROM activity
+        WHERE ftp_at_ride IS NOT NULL ORDER BY local_date`,
+    )
+    .all() as { local_date: string; watts: number }[];
+
+  const steps: { from: string; watts: number }[] = [];
+  for (const ride of rides) {
+    if (steps[steps.length - 1]?.watts !== ride.watts) {
+      steps.push({ from: ride.local_date, watts: ride.watts });
+    }
+  }
+  return c.json({ steps });
 });
 
 app.get('/api/types', (c) => {

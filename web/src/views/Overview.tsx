@@ -49,8 +49,14 @@ export function Overview() {
   const fatigue = today ? Math.round(today.fatigue) : null;
   const form = today ? Math.round(today.form) : null;
 
-  const twelveWeeksAgo = rows.find((r) => r.local_date >= isoDaysAgo(84));
-  const thenFitness = twelveWeeksAgo ? Math.round(twelveWeeksAgo.fitness) : null;
+  /* The honest comparison for "am I fitter": the same day a year ago. Twelve weeks, read
+     in October, measures him against his own August. The curve is fetched from 365 days
+     back, so its first row is that day, unless the history is shorter than a year or that
+     day still sat inside the 42-day warm-up, when there is nothing to compare with. */
+  const yearAgo = rows[0] ?? null;
+  const comparable =
+    yearAgo != null && yearAgo.local_date <= isoDaysAgo(358) && yearAgo.is_warmup === 0;
+  const thenFitness = comparable && yearAgo != null ? Math.round(yearAgo.fitness) : null;
   const change = fitness != null && thenFitness != null ? fitness - thenFitness : null;
 
   const strip = rows.slice(-90);
@@ -87,20 +93,12 @@ export function Overview() {
                 Fitness is <strong className="fig">{num(fitness)}</strong> points
                 {change != null && (
                   <>
-                    , <strong className="fig">{signed(change)}</strong> on twelve weeks ago (
-                    <span className="fig">{num(thenFitness)}</span>)
+                    , <strong className="fig">{signed(change)}</strong> on this day last year
                   </>
                 )}
-                . Form is <strong className="fig">{signed(form ?? 0)}</strong>, so you carry{' '}
+                . Form <strong className="fig">{signed(form ?? 0)}</strong>:{' '}
                 {(form ?? 0) > 15 ? 'little' : (form ?? 0) > -10 ? 'moderate' : 'heavy'} fatigue
                 into today.
-                {unmeasured > 0 && (
-                  <>
-                    {' '}
-                    <span className="fig">{num(unmeasured)}</span> of the last 90 days had a ride
-                    the model could not measure, so the curve runs below the real work there.
-                  </>
-                )}
               </>
             )}
           </p>
@@ -112,6 +110,7 @@ export function Overview() {
           <div className="kpis">
             <Kpi
               label="Fitness"
+              lead
               value={num(fitness)}
               note={
                 change == null ? (
@@ -119,8 +118,8 @@ export function Overview() {
                 ) : (
                   <>
                     42-day average load ·{' '}
-                    <span className={change < 0 ? 'bad' : 'good'}>{signed(change)}</span> on twelve
-                    weeks ago
+                    <span className={change < 0 ? 'bad' : 'good'}>{signed(change)}</span> on last
+                    year
                   </>
                 )
               }
@@ -129,7 +128,7 @@ export function Overview() {
             <Kpi
               label="Form"
               value={form == null ? DASH : signed(form)}
-              note="Fitness minus fatigue. Above zero is fresh."
+              note="Fitness minus fatigue, lagged a day. Above zero is fresh."
             />
             <Kpi
               label="This week"
@@ -259,7 +258,7 @@ export function Overview() {
               {recent.length === 0 && <p className="state">No rides imported yet.</p>}
             </div>
             <div className="card-foot">
-              <a className="btn-quiet" href="#activities">
+              <a className="link" href="#activities">
                 View all {num(coverage?.total)} rides
               </a>
             </div>
@@ -291,8 +290,7 @@ export function Overview() {
                   <KeyValue label="With a power-based TSS" value={num(coverage.withTss)} />
                 </div>
                 <p className="chart-note">
-                  Both kinds are counted rather than averaged in, and every day within 42 of one is
-                  marked, because those days feed the same window.
+                  Both kinds are counted rather than averaged in.
                 </p>
               </>
             )}
@@ -324,7 +322,7 @@ export function Overview() {
               ))}
             </div>
             <div className="card-foot">
-              <a className="btn-quiet" href="#trends">
+              <a className="link" href="#trends">
                 The whole curve
               </a>
             </div>
@@ -352,14 +350,17 @@ function Kpi({
   value,
   unit,
   note,
+  lead,
 }: {
   label: string;
   value: string;
   unit?: string;
   note?: React.ReactNode;
+  /** The figure that answers the screen's question. One per screen. */
+  lead?: boolean;
 }) {
   return (
-    <div className="kpi">
+    <div className={lead ? 'kpi kpi-lead' : 'kpi'}>
       <div className="kpi-label">{label}</div>
       <div className="kpi-value fig">
         {value}
