@@ -21,6 +21,10 @@ Everything below was observed from real responses, not from documentation.
 Reference implementation: [garmin/connect-personal-api-python](https://github.com/garmin/connect-personal-api-python)
 (Apache-2.0) — its `client.py` is the authoritative endpoint list.
 
+Declared surface: [Swagger docs](https://developer.garmin.com/gc-developer-program/personal/swagger-docs/)
+— 22 endpoints and their schemas. It says what Garmin offers; this document says what Peter's
+account returns. Where they disagree, this document wins.
+
 ### Four gotchas that cost real time
 
 1. **Rate limit: 100 requests per rolling window, undocumented.** Request 101 returns
@@ -176,6 +180,44 @@ not "deferred until available". They would require Peter to buy a watch.
 
 VO2 max and fitness age are likewise absent: `/userprofile-service/userprofile/settings` returns
 display preferences only (units, formats, timezone), no physiological values.
+
+## Fields the importer does not read
+
+Checked 22 October 2026 against all 423 stored `activity_raw.list_json` payloads. The importer
+promotes 34 columns; these are populated and left in the JSON.
+
+| Field | Populated on | Note |
+| --- | --- | --- |
+| `hrTimeInZone_1` … `_5` | **264 / 423** | 2024: 19 · 2025: 103 · 2026: **142 of 147**. By type: MTB 158, road 98, indoor 5, virtual 3. Buckets sum to **0.80 of ride duration** on average — paused and strapless time is in neither — so they are a share of recorded time, not of the ride. |
+| `maxAvgPower_1 … _300` | **135 / 135 powered** | Nine durations up to five minutes, with no FIT download. Garmin-computed, so also a cross-check: **133 of 135 rides agree with our FIT-derived curve within 1 %**. The three that do not are the sample-rate defect recorded in [`plan.md`](plan.md#4-sharpen-from-use). |
+| `avgRespirationRate`, `min`, `max` | 369 / 423 | From the Edge, not a wearable. |
+| `startLatitude/Longitude`, `endLatitude/Longitude` | 360 / 423 | |
+| `minElevation`, `maxElevation`, `maxVerticalSpeed` | 362 / 423 | |
+| `minTemperature`, `maxTemperature` | 381 / 423 | `avg_temperature` is stored; the range is not. |
+| `maxSpeed` | 420 / 423 | |
+| `maxFtp` | 243 / 423 | Distinct from the stored `ftp_at_ride`. |
+| `lapCount`, `minActivityLapDuration`, `bmrCalories`, `waterEstimated` | 423 / 423 | |
+
+Three candidates the same pass **closed**, so the Swagger listing does not reopen them:
+`splitSummaries` is non-empty on **6** rides, `isPR` is true on **4**, and
+`excludeFromPowerCurveReports` is true on **0**.
+
+## Declared but never probed
+
+Seven endpoints in the Swagger listing have no measurement here. Peter's key returned 401 on
+22 October 2026, so they could not be tested.
+
+`/biometric-service/heartRateZones/v2` (a `fetchHeartRateZones()` exists in `client.ts` and is
+never called) · `/wellnessactivity-service/activity/summary/range/{fromDate}/{untilDate}`
+(carries `TimeInZoneDTO`, and is a range query) · `/fitnessage-service/fitnessage/v2/{calendarDate}`
+· `/weight-service/weight/range/{startDate}/{endDate}` ·
+`/activity-service/activity/{activityId}/workouts` · `/usersummary-service/usersummary/daily` ·
+`/hrv-service/hrv/daily/{fromDate}/{toDate}`.
+
+Two of those matter to a claim made below. **VO2 max and fitness age are ruled out on the
+evidence of `/userprofile-service/settings`**, which only ever returns display preferences —
+the dedicated `fitnessage-service` endpoint was never tried, so that dismissal is unproven.
+**Weight is dismissed as irrelevant**, but with power on 135 rides it is W/kg.
 
 ## Endpoints worth using
 

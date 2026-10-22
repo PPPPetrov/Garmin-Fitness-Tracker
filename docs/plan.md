@@ -133,10 +133,94 @@ Done when: Peter opens the app, syncs, and can see whether this month is harder 
 
 ### 4. Sharpen from use
 
-- Review together after real use, then pick a short backlog.
-- Export, backup, restore, delete.
-- Candidates, not commitments: always-on hosting, phone access, route and segment comparison,
-  goals.
+Reviewed 22 October 2026 against Garmin's
+[Swagger docs](https://developer.garmin.com/gc-developer-program/personal/swagger-docs/) — the
+**declared** surface, 22 endpoints — and against the local database, which turns out to hold
+more than the importer reads. [`data-inventory.md`](data-inventory.md) remains the **measured**
+surface; where the two disagree, the measurement wins.
+
+The backlog is ordered by what the evidence supports, not by appeal. Three classes, and the
+first is the only one that is certain.
+
+#### A. Already in the database. No request, no key, no new dependency
+
+The importer promotes 34 columns out of `activity_raw.list_json`; the rest of the response is
+stored verbatim and never read.
+
+**A1 — Heart-rate time in zone. The one worth building.** `hrTimeInZone_1` … `_5` are populated
+on **264 of 423 rides**, and the coverage is recent rather than historical:
+
+| Year | 2024 | 2025 | 2026 |
+| --- | --- | --- | --- |
+| Rides with all five buckets | 19 | 103 | **142 of 147** |
+
+| Type | mountain_biking | road_biking | indoor_cycling | virtual_ride |
+| --- | --- | --- | --- | --- |
+| Rides with zones | 158 | 98 | 5 | 3 |
+
+It covers the mountain biking — the 58 % of the riding with no power meter, invisible to every
+power-derived figure in the project. The load model says how much; zones say what kind, which is
+the question it cannot answer. On a stretch where form climbed and fitness fell, zones separate
+*stopped riding* from *rode easy*.
+
+Two honest limits. The buckets sum to **0.80 of ride duration** on average, not 1.0 — paused and
+strapless time is in neither — so they are drawn as a share of recorded time, labelled, never as
+a share of the ride. And nothing before 2024 has them, so the zone view states its own range
+rather than inheriting the screen's.
+
+*Dashboard:* one stacked share bar per week, reusing the existing `.share-row` / `.share-fill`
+pattern from the Trends type tables. No new chart component.
+
+**A2 — Short-duration power without a FIT download.** `maxAvgPower_1, _2, _5, _10, _20, _30,
+_60, _120, _300` are populated on **all 135 powered rides**. The project spends a ~335 MB FIT
+download to derive durations the list response already carries up to five minutes. FIT is still
+required for 600 s and above.
+
+Worth more than the saving: these are nine Garmin-computed figures per ride to check the parser
+against, where [`data-inventory.md`](data-inventory.md) currently verifies one ride at one
+duration. Run as a cross-check on 22 October 2026, **133 of 135 rides agreed within 1 %**.
+
+**A3 — Known defect, found by that cross-check.** [`src/sync/fit.ts`](../src/sync/fit.ts) infers
+the sample rate from the gap between the **first two records only**, and `computePowerCurve`
+sizes its window in samples rather than walking timestamps. A ride opening with a pause has its
+whole stream mis-scaled. Ride `#22736415876` (2 May 2026, first gap 26 s) reports 476 W for one
+minute against Garmin's 222 W, and **holds the all-time record at 60 s, 120 s, 300 s and 600 s** —
+so four of the thirteen figures in "Best power held" are inflated. Two other rides are out by
+28 % and 19 %. Deferred by Peter on 22 October 2026, not disputed.
+
+**A4 — Minor, take only if a screen needs them.** Route start and end coordinates (360 rides),
+min/max elevation and max vertical speed (362), min/max temperature (381), max speed (420),
+lap count (423), respiration rate (369), `maxFtp` (243), `bmrCalories` (381).
+
+#### B. Declared in Swagger, never probed. Needs a working key first
+
+Peter's key currently returns 401, so none of these could be tested on 22 October 2026. Each is
+a probe before it is a feature.
+
+| Endpoint | Why it might matter |
+| --- | --- |
+| `/biometric-service/heartRateZones/v2` | The bpm boundaries that would label A1's zones. [`client.ts`](../src/garmin/client.ts) already has `fetchHeartRateZones()` and **nothing calls it**. |
+| `/wellnessactivity-service/activity/summary/range/{from}/{untilDate}` | Carries `TimeInZoneDTO`, and is a **range** query — one request where the activity detail needs 423. May supersede A1 or merely duplicate it. |
+| `/fitnessage-service/fitnessage/v2/{calendarDate}` | The inventory rules out VO2 max and fitness age, but on the evidence of `/userprofile-service/settings`, which only ever returns display preferences. This endpoint was never tried, so that dismissal is **unproven**. |
+| `/weight-service/weight/range/{startDate}/{endDate}` | Dismissed as irrelevant. With power on 135 rides it is W/kg, which is the figure riders actually compare. |
+| `/activity-service/activity/{activityId}/workouts` | Never probed. Structured workouts attached to a ride. |
+| `/usersummary-service/usersummary/daily`, `/hrv-service/hrv/daily/{fromDate}/{toDate}` | Only the `v2` and single-date variants were probed. The other shape was not. |
+
+#### C. Closed, with the measurement that closed it
+
+Not deferred — ruled out, so nobody reopens them on the strength of the Swagger listing.
+
+| Candidate | Measurement |
+| --- | --- |
+| Sleep, HRV, Body Battery, stress, steps, hydration, nutrition | Endpoints respond, values empty. No wearable. |
+| Per-ride splits and laps | `splitSummaries` non-empty on **6 of 423** rides. |
+| Garmin's own PR flag | `isPR` true on **4 of 423** rides. |
+| Excluding rides from the power curve | `excludeFromPowerCurveReports` true on **0** rides. |
+
+#### Still unplanned, still candidates
+
+Export, backup, restore, delete. Always-on hosting, phone access, route and segment comparison,
+goals.
 
 ## Technical direction
 
@@ -172,5 +256,6 @@ fitness score.
 
 - [Personal API overview](https://developer.garmin.com/gc-developer-program/personal/personal-api/)
 - [Personal API FAQ](https://developer.garmin.com/gc-developer-program/personal/personal-faq/)
+- [Swagger docs](https://developer.garmin.com/gc-developer-program/personal/swagger-docs/) — the declared endpoint surface and its schemas
 - [garmin/connect-personal-api-python](https://github.com/garmin/connect-personal-api-python) — authoritative endpoint list
 - [`data-inventory.md`](data-inventory.md) — what this account actually returns
