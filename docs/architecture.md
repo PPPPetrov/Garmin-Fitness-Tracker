@@ -108,15 +108,23 @@ power meter.
 
 For each powered ride: download, unwrap the ZIP, parse the FIT with `@garmin/fitsdk`, compute
 the peak mean power at each of thirteen durations (1, 5, 10, 15, 30, 60, 120, 300, 600, 1200,
-1800, 3600 and 5400 seconds), store the curve and discard the file. Progress is tracked per
-ride in `fit_file`, so an interrupted backfill resumes.
+1800, 3600 and 5400 seconds), store the curve and keep the file in `data/fit-cache`. A ride
+whose file is already there is parsed from disk, so a parser change costs no requests.
+Progress is tracked per ride in `fit_file`, so an interrupted backfill resumes.
+
+Every curve is then checked against Garmin's own `maxAvgPower_*` figures from the stored list
+response (`src/sync/powerCheck.ts`). A ride that disagrees by more than 1 % or 2 W at any
+shared duration goes back to `pending`, and `bestPowerCurve` reads only `parsed` rides, so a
+parser fault cannot hold a record.
 
 Three things the tests pin down, each of which was wrong at some point:
 
 - **Gaps count as zero watts.** A dropout is not a shorter ride; averaging over the samples
   present would invent a higher peak than was ridden.
-- **Windows scale by the sample rate.** A ride recorded every 4 seconds needs a 75-sample
-  window for 5 minutes, not 300.
+- **Windows are seconds, not records.** Readings are laid on a one-second grid by
+  timestamp, each standing for one interval of the file's recording rate. A pause is time at
+  zero watts; counting records instead once let a 26-second pause make a one-minute window
+  two records wide.
 - **Durations longer than the ride are left out**, not reported as zero.
 
 The ZIP tests build archives by hand, including the streamed variant whose local header
@@ -156,7 +164,7 @@ Every setting is read once, in `src/config.ts`, from the environment via `dotenv
 | `GARMIN_PERSONAL_API_KEY` | — | Required for anything that calls Garmin. Read lazily, so the server and the read-only CLI commands start without it. |
 | `GARMIN_PERSONAL_API_BASE_URL` | `https://personal.connectapi.garmin.com` | API host. |
 | `DATABASE_PATH` | `./data/garmin.db` | SQLite file. |
-| `FIT_CACHE_PATH` | `./data/fit-cache` | Scratch space for downloads. |
+| `FIT_CACHE_PATH` | `./data/fit-cache` | Downloaded FIT files, kept so a re-parse needs no network. `--discard-files` skips keeping them. |
 | `TOKEN_CACHE_PATH` | `./data/token.json` | Cached bearer token, written `0600`. |
 | `DISPLAY_TIMEZONE` | `Europe/Athens` | Reported by `/api/status`. Day grouping uses Garmin's own `local_date`, not this. |
 | `API_PORT` | `8787` | Where `src/server.ts` listens. |

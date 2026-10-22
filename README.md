@@ -92,12 +92,16 @@ npm run sync:fit
 ```
 
 Also downloads the original `.fit` files for rides with a power meter and extracts the power
-curve. Rides with no power meter are skipped, because there is nothing in them to extract.
+curve. Rides with no power meter are skipped, because there is nothing in them to extract. The
+files are kept in `data/fit-cache` (about 335 MB for the full history) so a re-parse reads the
+disk; pass `-- --discard-files` to skip that. Each curve is checked against Garmin's own peak
+power figures, and a ride that disagrees is left out of the records until it parses cleanly.
 
 ```bash
 npm run stats                 # coverage and the current numbers, in the terminal
 npx tsx src/cli.ts recompute  # rebuild the load model without touching the network
 npx tsx src/cli.ts backfill   # promote stored fields into columns, also offline
+npx tsx src/cli.ts verify-power  # check stored power curves against Garmin's, offline
 ```
 
 ## Running the dashboard

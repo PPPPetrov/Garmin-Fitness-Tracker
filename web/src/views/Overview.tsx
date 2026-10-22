@@ -5,6 +5,7 @@ import {
   type FormPosition,
   type FormReading,
   type LoadDay,
+  type PowerCurve,
   type PowerPoint,
   type Status,
   type Week,
@@ -16,6 +17,7 @@ import {
   DASH,
   duration,
   durationLabel,
+  heldBackNote,
   isoDaysAgo,
   km,
   longDate,
@@ -38,7 +40,7 @@ export function Overview() {
   const overview = useApi<OverviewData>('/api/overview');
   const load = useApi<{ rows: LoadDay[] }>(`/api/load?from=${isoDaysAgo(365)}`);
   const status = useApi<Status>('/api/status');
-  const power = useApi<{ rows: PowerPoint[] }>('/api/power-curve');
+  const power = useApi<PowerCurve>('/api/power-curve');
   const reading = useApi<FormReading>('/api/form');
 
   if (overview.state === 'error') {
@@ -422,6 +424,9 @@ export function Overview() {
                 </div>
               ))}
             </div>
+            {power.state === 'ready' && power.data.heldBack > 0 && (
+              <p className="chart-note">{heldBackNote(power.data.heldBack)}</p>
+            )}
             <div className="card-foot">
               <a className="link" href="#trends">
                 The whole curve

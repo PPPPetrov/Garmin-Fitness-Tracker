@@ -4,7 +4,7 @@ import {
   type Async,
   type FtpStep,
   type LoadDay,
-  type PowerPoint,
+  type PowerCurve,
   type RideType,
   type Season,
   type Week,
@@ -15,6 +15,7 @@ import { LineChart, LineLegend } from '../charts/Line';
 import {
   DASH,
   durationLabel,
+  heldBackNote,
   isoDaysAgo,
   longDate,
   monthYear,
@@ -49,8 +50,8 @@ export function Trends() {
   const ftp = useApi<{ steps: FtpStep[] }>('/api/ftp');
   const seasons = useApi<{ rows: Season[] }>('/api/seasons');
   const zones = useApi<ZoneReading>(`/api/zones?from=${from}`, [range.id]);
-  const thisSeason = useApi<{ rows: PowerPoint[] }>(`/api/power-curve?since=${year}-01-01`);
-  const lastSeason = useApi<{ rows: PowerPoint[] }>(
+  const thisSeason = useApi<PowerCurve>(`/api/power-curve?since=${year}-01-01`);
+  const lastSeason = useApi<PowerCurve>(
     `/api/power-curve?since=${year - 1}-01-01&to=${year - 1}${monthDay}`,
   );
 
@@ -93,6 +94,9 @@ export function Trends() {
     now: peakAt(thisSeason, duration),
     before: peakAt(lastSeason, duration),
   })).filter((p) => p.now != null || p.before != null);
+  const heldBack =
+    (thisSeason.state === 'ready' ? thisSeason.data.heldBack : 0) +
+    (lastSeason.state === 'ready' ? lastSeason.data.heldBack : 0);
   /* The bar and the percentage beside it are the same number, so a row can never say
      two things: here the share of all rides, below the share of that type's own rides. */
   const typeTotal = typeRows.reduce((sum, t) => sum + t.n, 0);
@@ -380,6 +384,7 @@ export function Trends() {
               </tbody>
             </table>
           )}
+          {heldBack > 0 && <p className="chart-note">{heldBackNote(heldBack)}</p>}
         </section>
       </div>
 
@@ -549,7 +554,7 @@ function zoneNote({ period, previous }: ZoneReading): React.ReactNode {
   );
 }
 
-function peakAt(curve: Async<{ rows: PowerPoint[] }>, duration: number): number | null {
+function peakAt(curve: Async<PowerCurve>, duration: number): number | null {
   if (curve.state !== 'ready') return null;
   return curve.data.rows.find((r) => r.duration_s === duration)?.watts ?? null;
 }
