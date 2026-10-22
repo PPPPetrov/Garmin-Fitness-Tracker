@@ -15,7 +15,14 @@ function required(name: string): string {
 }
 
 export const config = {
-  apiKey: required('GARMIN_PERSONAL_API_KEY'),
+  /**
+   * Read lazily: browsing a database that is already imported needs no Garmin key, so
+   * the server and the CLI's read-only commands start without one. Only the calls that
+   * actually reach Garmin ask for it, and then the error names what to do.
+   */
+  get apiKey(): string {
+    return required('GARMIN_PERSONAL_API_KEY');
+  },
   baseUrl: process.env.GARMIN_PERSONAL_API_BASE_URL ?? 'https://personal.connectapi.garmin.com',
   databasePath: resolve(process.env.DATABASE_PATH ?? './data/garmin.db'),
   fitCachePath: resolve(process.env.FIT_CACHE_PATH ?? './data/fit-cache'),

@@ -73,6 +73,30 @@ app.get('/api/overview', (c) => {
   return c.json({ today: latest ?? null, weeks, recent });
 });
 
+/**
+ * Weekly rollups over an arbitrary range, so the Trends screen can total the period it
+ * is showing rather than re-deriving it from the activity list in the browser.
+ */
+app.get('/api/weeks', (c) => {
+  const from = c.req.query('from') ?? '1970-01-01';
+  const to = c.req.query('to') ?? '2999-12-31';
+  const rows = db()
+    .prepare(
+      `SELECT strftime('%Y-%W', local_date) AS week,
+              MIN(local_date) AS week_start,
+              COUNT(*) AS rides,
+              ROUND(SUM(COALESCE(duration_s,0))/3600.0, 2) AS hours,
+              ROUND(SUM(COALESCE(distance_m,0))/1000.0, 1) AS km,
+              ROUND(SUM(COALESCE(elevation_gain_m,0))) AS elevation_m,
+              ROUND(SUM(COALESCE(activity_training_load,0))) AS load_points
+         FROM activity
+        WHERE local_date BETWEEN ? AND ?
+        GROUP BY week ORDER BY week`,
+    )
+    .all(from, to);
+  return c.json({ rows });
+});
+
 app.get('/api/load', (c) => {
   const from = c.req.query('from') ?? '1970-01-01';
   const to = c.req.query('to') ?? '2999-12-31';
@@ -154,7 +178,14 @@ app.get('/api/types', (c) => {
   const rows = db()
     .prepare(
       `SELECT activity_type, COUNT(*) AS n,
-              SUM(CASE WHEN avg_power IS NOT NULL THEN 1 ELSE 0 END) AS powered
+              SUM(CASE WHEN avg_power IS NOT NULL THEN 1 ELSE 0 END) AS powered,
+              -- The two disjoint halves of UNRELIABLE_LOAD_SQL, so these counts sum to
+              -- exactly the unreliableLoad figure /api/status reports. A fact shown on
+              -- two screens has to be one rule.
+              SUM(CASE WHEN activity_training_load IS NULL THEN 1 ELSE 0 END) AS no_load,
+              SUM(CASE WHEN activity_training_load IS NOT NULL
+                        AND avg_hr IS NULL AND COALESCE(duration_s, 0) > 600
+                       THEN 1 ELSE 0 END) AS no_strap
          FROM activity GROUP BY activity_type ORDER BY n DESC`,
     )
     .all();

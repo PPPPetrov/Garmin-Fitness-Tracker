@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useApi, type Activity } from '../api';
-import { DASH, duration, km, num, typeName, watts } from '../format';
+import { useApi, type Activity, type RideType } from '../api';
+import { DASH, duration, km, num, rideName, typeName, watts } from '../format';
 
 interface Page {
   total: number;
@@ -9,12 +9,19 @@ interface Page {
   rows: Activity[];
 }
 
-interface Types {
-  rows: { activity_type: string; n: number; powered: number }[];
-}
-
 const PAGE = 50;
 
+/**
+ * The same test the load model uses, so a row flagged here is a row the curve discounts:
+ * no training load at all, or no heart-rate strap on a ride long enough to matter.
+ */
+function unusableLoad(a: Activity): string | null {
+  if (a.activity_training_load == null) return 'no training load';
+  if (a.avg_hr == null && (a.duration_s ?? 0) > 600) return 'no heart-rate strap';
+  return null;
+}
+
+/** The screen's question: find the ride I am thinking of. */
 export function Activities() {
   const [type, setType] = useState('');
   const [search, setSearch] = useState('');
@@ -25,21 +32,27 @@ export function Activities() {
   if (search) query.set('search', search);
 
   const page = useApi<Page>(`/api/activities?${query}`, [type, search, offset]);
-  const types = useApi<Types>('/api/types');
+  const types = useApi<{ rows: RideType[] }>('/api/types');
 
   const change = (next: () => void) => {
     setOffset(0);
     next();
   };
 
+  const total = page.state === 'ready' ? page.data.total : null;
+  const filtered = Boolean(type || search);
+
   return (
     <>
       <div className="title-row">
-        <h1>Activities</h1>
+        <div className="title-block">
+          <h1>Activities</h1>
+          <p className="finding">
+            Every ride imported from Garmin, newest first. A dash means the sensor was not
+            there. It is never a zero, and the ride is never dropped.
+          </p>
+        </div>
       </div>
-      <p className="finding">
-        Every ride imported from Garmin. A dash means the sensor was not there, not a zero.
-      </p>
 
       <div className="filters">
         <select
@@ -52,7 +65,7 @@ export function Activities() {
           {types.state === 'ready' &&
             types.data.rows.map((t) => (
               <option key={t.activity_type} value={t.activity_type}>
-                {typeName(t.activity_type)} ({t.n}, {t.powered} with power)
+                {typeName(t.activity_type)} ({t.n})
               </option>
             ))}
         </select>
@@ -64,23 +77,31 @@ export function Activities() {
           aria-label="Search rides"
           onChange={(e) => change(() => setSearch(e.target.value))}
         />
-        {page.state === 'ready' && (
-          <span className="sub">
-            {num(page.data.total)} ride{page.data.total === 1 ? '' : 's'}
-          </span>
-        )}
+        <span className="sub">
+          {total == null ? (
+            'Counting…'
+          ) : (
+            <>
+              <span className="fig">{num(total)}</span> ride{total === 1 ? '' : 's'}
+              {filtered ? ' match these filters' : ''}
+            </>
+          )}
+        </span>
       </div>
 
-      {page.state === 'loading' && <p className="state">Loading…</p>}
-      {page.state === 'error' && <p className="state state-error">{page.message}</p>}
-
-      {page.state === 'ready' && page.data.total === 0 && (
-        <p className="state">No rides match these filters.</p>
+      {page.state === 'error' && (
+        <p className="state state-error">Could not load the rides: {page.message}</p>
       )}
 
-      {page.state === 'ready' && page.data.total > 0 && (
+      {page.state === 'ready' && page.data.total === 0 && (
+        <p className="state">
+          No rides match these filters. Clear the search or choose another type.
+        </p>
+      )}
+
+      {(page.state === 'loading' || (page.state === 'ready' && page.data.total > 0)) && (
         <>
-          <div className="card table-scroll">
+          <div className="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -99,64 +120,83 @@ export function Activities() {
                 </tr>
               </thead>
               <tbody>
-                {page.data.rows.map((a) => (
-                  <tr key={a.activity_id}>
-                    <td>{a.local_date}</td>
-                    <td>
-                      {a.activity_name ?? DASH}
-                      {a.location_name && <div className="sub">{a.location_name}</div>}
-                    </td>
-                    <td>{typeName(a.activity_type)}</td>
-                    <td className="num">{duration(a.duration_s)}</td>
-                    <td className="num">{km(a.distance_m)}</td>
-                    <td className="num">
-                      <Cell value={a.elevation_gain_m} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.avg_power} format={watts} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.normalized_power} format={watts} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.ftp_at_ride} format={watts} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.training_stress_score} format={(v) => num(v, 0)} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.activity_training_load} format={(v) => num(v, 0)} />
-                    </td>
-                    <td className="num">
-                      <Cell value={a.avg_hr} />
-                    </td>
-                  </tr>
-                ))}
+                {page.state === 'loading' &&
+                  Array.from({ length: 12 }, (_, i) => (
+                    <tr key={i}>
+                      <td colSpan={12}>
+                        <div className="skeleton skeleton-row" style={{ width: '100%' }} />
+                      </td>
+                    </tr>
+                  ))}
+
+                {page.state === 'ready' &&
+                  page.data.rows.map((a) => {
+                    const flag = unusableLoad(a);
+                    return (
+                      <tr key={a.activity_id}>
+                        <td className="fig">{a.local_date}</td>
+                        <td className="name">
+                          <div className="row-name">{rideName(a.activity_name, DASH)}</div>
+                          {(a.location_name || flag) && (
+                            <div className="sub">
+                              {[a.location_name, flag].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
+                        </td>
+                        <td>{typeName(a.activity_type)}</td>
+                        <td className="num fig">{duration(a.duration_s)}</td>
+                        <td className="num fig">{km(a.distance_m)}</td>
+                        <td className="num fig">
+                          <Cell value={a.elevation_gain_m} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.avg_power} format={watts} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.normalized_power} format={watts} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.ftp_at_ride} format={watts} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.training_stress_score} format={(v) => num(v, 0)} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.activity_training_load} format={(v) => num(v, 0)} />
+                        </td>
+                        <td className="num fig">
+                          <Cell value={a.avg_hr} />
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
 
-          <div className="filters" style={{ marginTop: 16 }}>
-            <button
-              className="btn-quiet"
-              type="button"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE))}
-            >
-              Previous
-            </button>
-            <button
-              className="btn-quiet"
-              type="button"
-              disabled={offset + PAGE >= page.data.total}
-              onClick={() => setOffset(offset + PAGE)}
-            >
-              Next
-            </button>
-            <span className="sub">
-              {offset + 1}–{Math.min(offset + PAGE, page.data.total)} of {num(page.data.total)}
-            </span>
-          </div>
+          {page.state === 'ready' && (
+            <div className="filters" style={{ marginTop: 16, marginBottom: 0 }}>
+              <button
+                className="btn-quiet"
+                type="button"
+                disabled={offset === 0}
+                onClick={() => setOffset(Math.max(0, offset - PAGE))}
+              >
+                Previous
+              </button>
+              <button
+                className="btn-quiet"
+                type="button"
+                disabled={offset + PAGE >= page.data.total}
+                onClick={() => setOffset(offset + PAGE)}
+              >
+                Next
+              </button>
+              <span className="sub fig">
+                {offset + 1}–{Math.min(offset + PAGE, page.data.total)} of {num(page.data.total)}
+              </span>
+            </div>
+          )}
         </>
       )}
     </>
