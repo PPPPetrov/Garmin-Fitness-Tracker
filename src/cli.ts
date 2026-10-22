@@ -2,7 +2,7 @@ import { bestPowerCurve, loadCoverage, recomputeDailyLoad } from './calc/load.js
 import { closeDb, db } from './db/index.js';
 import { setThrottleListener } from './garmin/client.js';
 import { syncFitFiles } from './sync/fit.js';
-import { syncActivities } from './sync/import.js';
+import { backfillFromRaw, syncActivities } from './sync/import.js';
 
 const log = (message: string) => process.stdout.write(message + '\n');
 
@@ -131,10 +131,16 @@ async function main(): Promise<void> {
         commandStats();
         break;
       }
+      case 'backfill': {
+        const filled = backfillFromRaw();
+        log(`Read ${filled.rides} stored list payloads; ${filled.withZones} carried heart-rate zones`);
+        break;
+      }
       default:
         log('Usage: npm run sync [-- --fit --incremental --keep-files]');
         log('       npm run stats');
         log('       npx tsx src/cli.ts recompute');
+        log('       npx tsx src/cli.ts backfill   # promote stored fields, no network');
         process.exitCode = 1;
     }
   } finally {

@@ -12,6 +12,28 @@ export interface LoadDay {
   is_estimated: number;
 }
 
+/** Where today's form sits against the rider's own measured history. */
+export type FormBand = 'buried' | 'tired' | 'typical' | 'fresh' | 'freshest';
+
+export interface FormPosition {
+  date: string;
+  form: number;
+  fitness: number;
+  percentile: number;
+  rank: number;
+  measuredDays: number;
+  band: FormBand;
+  streak: number;
+  change: { days: number; form: number; fitness: number };
+  lastInBand: string | null;
+  confidence: { estimated: number; days: number };
+}
+
+export interface FormReading {
+  position: FormPosition | null;
+  windows: { change: number; confidence: number };
+}
+
 export interface Week {
   week: string;
   week_start: string;
@@ -20,6 +42,22 @@ export interface Week {
   km: number;
   elevation_m: number;
   load_points: number;
+}
+
+/** Seconds in each heart-rate zone over a span, with the span before it. */
+export interface ZoneTotals {
+  from: string;
+  to: string;
+  seconds: number[];
+  zoneSeconds: number;
+  rides: number;
+  ridesTotal: number;
+  coverage: number | null;
+}
+
+export interface ZoneReading {
+  period: ZoneTotals;
+  previous: ZoneTotals;
 }
 
 export interface Activity {

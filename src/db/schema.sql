@@ -45,6 +45,15 @@ CREATE TABLE IF NOT EXISTS activity (
   anaerobic_training_effect REAL,
   training_effect_label  TEXT,
 
+  -- Seconds in each heart-rate zone, from the activity list response. Present on
+  -- 264 of 423 rides and on none before 2024: Garmin began reporting them partway
+  -- through the history. NULL means the ride carried no buckets, not zero seconds.
+  hr_zone_1_s            REAL,
+  hr_zone_2_s            REAL,
+  hr_zone_3_s            REAL,
+  hr_zone_4_s            REAL,
+  hr_zone_5_s            REAL,
+
   location_name          TEXT,
   uploaded_at            TEXT,
   last_updated_at        TEXT,

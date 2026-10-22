@@ -8,6 +8,8 @@ import {
   type RideType,
   type Season,
   type Week,
+  type ZoneReading,
+  type ZoneTotals,
 } from '../api';
 import { LineChart, LineLegend } from '../charts/Line';
 import {
@@ -46,6 +48,7 @@ export function Trends() {
   const types = useApi<{ rows: RideType[] }>('/api/types');
   const ftp = useApi<{ steps: FtpStep[] }>('/api/ftp');
   const seasons = useApi<{ rows: Season[] }>('/api/seasons');
+  const zones = useApi<ZoneReading>(`/api/zones?from=${from}`, [range.id]);
   const thisSeason = useApi<{ rows: PowerPoint[] }>(`/api/power-curve?since=${year}-01-01`);
   const lastSeason = useApi<{ rows: PowerPoint[] }>(
     `/api/power-curve?since=${year - 1}-01-01&to=${year - 1}${monthDay}`,
@@ -236,6 +239,58 @@ export function Trends() {
           />
         )}
         {load.state === 'loading' && <div className="skeleton skeleton-plot" style={{ height: 180 }} />}
+      </section>
+
+      <section className="band">
+        <div className="band-head">
+          <h2 className="band-title">Time in heart-rate zone</h2>
+          {zones.state === 'ready' && zones.data.period.rides > 0 && (
+            <span className="card-note">
+              <span className="fig">{num(zones.data.period.rides)}</span> of{' '}
+              <span className="fig">{num(zones.data.period.ridesTotal)}</span> rides carry zones
+            </span>
+          )}
+        </div>
+        <p className="band-desc">
+          What kind of riding this was, rather than how much of it. These are the only intensity
+          figures here that reach the mountain biking, which has no power meter.
+        </p>
+
+        {zones.state === 'error' && <p className="state state-error">{zones.message}</p>}
+        {zones.state === 'loading' && (
+          <div className="skeleton skeleton-plot" style={{ height: 230 }} />
+        )}
+        {zones.state === 'ready' && zones.data.period.rides === 0 && (
+          <p className="state">
+            No ride in this period carries zone data. Garmin began reporting the buckets partway
+            through the history, and nothing before 2024 has them.
+          </p>
+        )}
+
+        {zones.state === 'ready' && zones.data.period.rides > 0 && (
+          <>
+            <div className="share">
+              {zones.data.period.seconds.map((seconds, i) => (
+                <div className="share-row" key={i}>
+                  <div
+                    className="share-fill"
+                    style={{
+                      width: `${(seconds / Math.max(1, zones.data.period.zoneSeconds)) * 100}%`,
+                    }}
+                  />
+                  <span className="share-label">Zone {i + 1}</span>
+                  <span className="share-figures">
+                    <span className="share-pct fig">
+                      {pct(seconds, zones.data.period.zoneSeconds)}
+                    </span>
+                    <span className="fig">{num(seconds / 3600, 1)} h</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="chart-note">{zoneNote(zones.data)}</p>
+          </>
+        )}
       </section>
 
       <div className="pair">
@@ -459,6 +514,40 @@ export function Trends() {
 
 /** The six durations a rider actually talks about. */
 const PEAK_DURATIONS = [5, 60, 300, 600, 1200, 3600];
+
+/**
+ * The two things a share table cannot say for itself: how much of the riding the buckets
+ * actually cover, and whether the shape has moved. The comparison span is the one of equal
+ * length immediately before it, the way the season tables are held against each other.
+ */
+function zoneNote({ period, previous }: ZoneReading): React.ReactNode {
+  const hardShare = (t: ZoneTotals) =>
+    t.zoneSeconds > 0 ? ((t.seconds[3] ?? 0) + (t.seconds[4] ?? 0)) / t.zoneSeconds : null;
+  const now = hardShare(period);
+  const then = hardShare(previous);
+
+  return (
+    <>
+      Shares of recorded time, not of the ride: the buckets cover{' '}
+      <span className="fig">{period.coverage == null ? DASH : pct(period.coverage, 1)}</span> of
+      ride time in this period, and paused or strapless time falls into none of them.
+      {now != null && then != null && previous.rides > 0 && (
+        <>
+          {' '}
+          Zones 4 and 5 together were <span className="fig">{pct(then, 1)}</span> of the span
+          before this one and <span className="fig">{pct(now, 1)}</span> of this one. Compare the
+          shares and not the hours: that span carried zones on{' '}
+          <span className="fig">{num(previous.rides)}</span> of its{' '}
+          <span className="fig">{num(previous.ridesTotal)}</span> rides against{' '}
+          <span className="fig">{num(period.rides)}</span> of{' '}
+          <span className="fig">{num(period.ridesTotal)}</span> here, so the time behind the two
+          is not the same quantity.
+        </>
+      )}{' '}
+      The bpm boundaries behind the zones sit in the Garmin profile and are not read yet.
+    </>
+  );
+}
 
 function peakAt(curve: Async<{ rows: PowerPoint[] }>, duration: number): number | null {
   if (curve.state !== 'ready') return null;

@@ -32,6 +32,13 @@ function migrate(database: Database.Database): void {
       'unmeasured_rides INTEGER NOT NULL DEFAULT 0',
       'is_estimated INTEGER NOT NULL DEFAULT 0',
     ],
+    activity: [
+      'hr_zone_1_s REAL',
+      'hr_zone_2_s REAL',
+      'hr_zone_3_s REAL',
+      'hr_zone_4_s REAL',
+      'hr_zone_5_s REAL',
+    ],
   };
 
   for (const [table, columns] of Object.entries(added)) {

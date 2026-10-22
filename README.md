@@ -26,6 +26,20 @@ is kept; the files are discarded.
 `activityTrainingLoad` — 42 days for fitness, 7 for fatigue, with form the difference. The
 maths is in [`docs/load-model.md`](docs/load-model.md).
 
+**Places today's form** against every day the model has measured, rather than against the
+generic cycling thresholds, which belong to somebody else's history — against this one, −10 is
+an ordinary Tuesday. It reports the rank, the fifth of your own distribution you are in, how
+long you have been on this side of zero, and when you were last here. It reports the change in
+fitness over the same four weeks beside the change in form, because form rises when fitness
+falls exactly as it rises when fatigue does, and only the pair tells a taper from a fortnight
+off. It does not tell you what to ride.
+
+**Breaks the riding down by heart-rate zone**, which is the only intensity measure here that
+reaches the mountain biking, where there is no power meter. Garmin reports five buckets per ride
+in the activity list; they sit on 264 of 423 rides and on none before 2024. The figures are
+shares of recorded time rather than of the ride, because paused and strapless time falls into no
+bucket, and a ride carrying a partial set is dropped rather than having its gaps read as zero.
+
 **Tells you where it cannot see.** Two kinds of ride carry a training load the model cannot
 trust: one Garmin gave no load at all, and one recorded without a heart-rate strap, where
 Garmin returns a figure about eight times too low instead of returning nothing. Both are
@@ -83,6 +97,7 @@ curve. Rides with no power meter are skipped, because there is nothing in them t
 ```bash
 npm run stats                 # coverage and the current numbers, in the terminal
 npx tsx src/cli.ts recompute  # rebuild the load model without touching the network
+npx tsx src/cli.ts backfill   # promote stored fields into columns, also offline
 ```
 
 ## Running the dashboard
@@ -106,9 +121,10 @@ npm test          # node:test via tsx
 npm run typecheck
 ```
 
-29 tests over the two parts that are easy to get quietly wrong: the load model and FIT
-handling. What each one pins down is described in
-[`docs/load-model.md`](docs/load-model.md#what-the-tests-pin-down) and
+49 tests over the four parts that are easy to get quietly wrong: the load model, where today's
+form sits, the heart-rate zone totals, and FIT handling. What each one pins down is described in
+[`docs/load-model.md`](docs/load-model.md#what-the-tests-pin-down),
+[`docs/load-model.md`](docs/load-model.md#what-the-form-tests-pin-down) and
 [`docs/architecture.md`](docs/architecture.md#fit-files).
 
 ## Documentation
