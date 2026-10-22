@@ -48,6 +48,19 @@ picked:
 `distance_m`, `elevation_gain_m`, `elevation_loss_m`, `calories`, `avg_hr`, `max_hr`,
 `avg_cadence`, `avg_temperature`.
 
+### Heart-rate zone fields
+
+`hr_zone_1_s` … `hr_zone_5_s` — seconds in each of Garmin's five heart-rate zones, taken from
+the activity **list** response rather than the detail one.
+
+Present on 264 of 423 rides and on none before 2024: Garmin began reporting the buckets partway
+through the history. `NULL` means the ride carried no buckets at all, not zero seconds in that
+zone — a ride recorded without a strap has none of them, and reading the gap as zero would claim
+the rider spent that time in Zone 1.
+
+They were in `activity_raw.list_json` from the first import and promoted later, so filling them
+needed no network: `npx tsx src/cli.ts backfill`.
+
 ### Power fields
 
 `avg_power`, `max_power`, `normalized_power`, `max_power_20min`, `ftp_at_ride`,

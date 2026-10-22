@@ -161,6 +161,39 @@ so the first and last weeks of a range may be partial.
 
 ---
 
+## `GET /api/zones`
+
+Seconds in each heart-rate zone over a span, with the span of equal length before it.
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `from` | `1970-01-01` | Inclusive start date. |
+| `to` | today | Inclusive end date. |
+
+```json
+{
+  "period":   { "from": "2026-07-24", "to": "2026-10-22",
+                "seconds": [64800, 132120, 131760, 52560, 14400], "zoneSeconds": 395640,
+                "rides": 46, "ridesTotal": 50, "coverage": 0.91 },
+  "previous": { "from": "2026-04-24", "to": "2026-07-23", "...": "..." }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `seconds` | Five buckets, in seconds, summed over the rides that carried **all five**. |
+| `rides` / `ridesTotal` | Rides that carried zones, and rides in the span. |
+| `coverage` | `zoneSeconds` over the duration of **the rides that carried zones** — about 0.9 recently and 0.8 across the whole history, because paused and strapless time falls into no bucket. `null` when nothing carried them. |
+
+A ride with a partial set of buckets is dropped rather than having its gaps read as zero, for
+the same reason the load model flags a strapless ride instead of averaging it in.
+
+`previous` exists so the two can be compared, but **only the shares are comparable** — zone
+coverage differs between spans, so the absolute seconds behind them are not the same quantity.
+The dashboard says so under the table.
+
+---
+
 ## `GET /api/activities`
 
 The paged ride list.

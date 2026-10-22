@@ -40,11 +40,13 @@ function upsertFromList(item: ActivityListItem): 'added' | 'updated' {
       `INSERT INTO activity (
          activity_id, activity_name, activity_type, start_time_local, start_time_gmt,
          local_date, duration_s, moving_duration_s, elapsed_duration_s, distance_m,
-         elevation_gain_m, calories, avg_hr, max_hr, avg_power, normalized_power, imported_at
+         elevation_gain_m, calories, avg_hr, max_hr, avg_power, normalized_power,
+         hr_zone_1_s, hr_zone_2_s, hr_zone_3_s, hr_zone_4_s, hr_zone_5_s, imported_at
        ) VALUES (
          @activity_id, @activity_name, @activity_type, @start_time_local, @start_time_gmt,
          @local_date, @duration_s, @moving_duration_s, @elapsed_duration_s, @distance_m,
-         @elevation_gain_m, @calories, @avg_hr, @max_hr, @avg_power, @normalized_power, @imported_at
+         @elevation_gain_m, @calories, @avg_hr, @max_hr, @avg_power, @normalized_power,
+         @hr_zone_1_s, @hr_zone_2_s, @hr_zone_3_s, @hr_zone_4_s, @hr_zone_5_s, @imported_at
        )
        ON CONFLICT(activity_id) DO UPDATE SET
          activity_name = excluded.activity_name,
@@ -56,7 +58,12 @@ function upsertFromList(item: ActivityListItem): 'added' | 'updated' {
          avg_hr = excluded.avg_hr,
          max_hr = excluded.max_hr,
          avg_power = excluded.avg_power,
-         normalized_power = excluded.normalized_power`,
+         normalized_power = excluded.normalized_power,
+         hr_zone_1_s = excluded.hr_zone_1_s,
+         hr_zone_2_s = excluded.hr_zone_2_s,
+         hr_zone_3_s = excluded.hr_zone_3_s,
+         hr_zone_4_s = excluded.hr_zone_4_s,
+         hr_zone_5_s = excluded.hr_zone_5_s`,
     )
     .run({
       activity_id: item.activityId,
@@ -75,6 +82,11 @@ function upsertFromList(item: ActivityListItem): 'added' | 'updated' {
       max_hr: item.maxHR || null,
       avg_power: item.avgPower,
       normalized_power: item.normPower,
+      hr_zone_1_s: item.hrTimeInZone_1 ?? null,
+      hr_zone_2_s: item.hrTimeInZone_2 ?? null,
+      hr_zone_3_s: item.hrTimeInZone_3 ?? null,
+      hr_zone_4_s: item.hrTimeInZone_4 ?? null,
+      hr_zone_5_s: item.hrTimeInZone_5 ?? null,
       imported_at: nowIso(),
     });
 
@@ -257,4 +269,42 @@ export async function syncActivities(options: SyncOptions = {}): Promise<SyncRes
       .run(nowIso(), error instanceof Error ? error.message : String(error), runId);
     throw error;
   }
+}
+
+/**
+ * Promote fields from the stored list payload into columns, without touching the network.
+ *
+ * The whole list response has always been kept verbatim in `activity_raw.list_json`, so a
+ * field the importer did not read is not a field that has to be fetched again. Re-running
+ * is safe and needs no API key: it reads a local file and writes a local file.
+ */
+export function backfillFromRaw(): { rides: number; withZones: number } {
+  const database = db();
+
+  const rows = database
+    .prepare(`SELECT activity_id, list_json FROM activity_raw WHERE list_json IS NOT NULL`)
+    .all() as { activity_id: number; list_json: string }[];
+
+  const update = database.prepare(
+    `UPDATE activity
+        SET hr_zone_1_s = ?, hr_zone_2_s = ?, hr_zone_3_s = ?, hr_zone_4_s = ?, hr_zone_5_s = ?
+      WHERE activity_id = ?`,
+  );
+
+  let withZones = 0;
+
+  database.transaction(() => {
+    for (const row of rows) {
+      const item = JSON.parse(row.list_json) as Record<string, unknown>;
+      const zones = [1, 2, 3, 4, 5].map((n) => {
+        const value = item[`hrTimeInZone_${n}`];
+        return typeof value === 'number' ? value : null;
+      });
+
+      if (zones.every((z) => z != null)) withZones++;
+      update.run(...zones, row.activity_id);
+    }
+  })();
+
+  return { rides: rows.length, withZones };
 }

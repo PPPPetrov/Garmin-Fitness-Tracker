@@ -6,6 +6,7 @@ import {
   currentFormPosition,
 } from './calc/form.js';
 import { bestPowerCurve, loadCoverage, recomputeDailyLoad, today } from './calc/load.js';
+import { zonesInRange } from './calc/zones.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
 import { syncActivities } from './sync/import.js';
@@ -120,6 +121,12 @@ app.get('/api/form', (c) => {
     position: currentFormPosition(),
     windows: { change: CHANGE_WINDOW_DAYS, confidence: CONFIDENCE_WINDOW_DAYS },
   });
+});
+
+app.get('/api/zones', (c) => {
+  const from = c.req.query('from') ?? '1970-01-01';
+  const to = c.req.query('to') ?? today();
+  return c.json(zonesInRange(from, to));
 });
 
 app.get('/api/activities', (c) => {

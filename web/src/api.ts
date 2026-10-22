@@ -44,6 +44,22 @@ export interface Week {
   load_points: number;
 }
 
+/** Seconds in each heart-rate zone over a span, with the span before it. */
+export interface ZoneTotals {
+  from: string;
+  to: string;
+  seconds: number[];
+  zoneSeconds: number;
+  rides: number;
+  ridesTotal: number;
+  coverage: number | null;
+}
+
+export interface ZoneReading {
+  period: ZoneTotals;
+  previous: ZoneTotals;
+}
+
 export interface Activity {
   activity_id: number;
   activity_name: string | null;

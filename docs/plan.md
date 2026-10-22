@@ -147,8 +147,8 @@ first is the only one that is certain.
 The importer promotes 34 columns out of `activity_raw.list_json`; the rest of the response is
 stored verbatim and never read.
 
-**A1 — Heart-rate time in zone. The one worth building.** `hrTimeInZone_1` … `_5` are populated
-on **264 of 423 rides**, and the coverage is recent rather than historical:
+**A1 — Heart-rate time in zone. Built 22 October 2026.** `hrTimeInZone_1` … `_5` were populated
+on **264 of 423 rides** and never read. The coverage is recent rather than historical:
 
 | Year | 2024 | 2025 | 2026 |
 | --- | --- | --- | --- |
@@ -163,13 +163,23 @@ power-derived figure in the project. The load model says how much; zones say wha
 the question it cannot answer. On a stretch where form climbed and fitness fell, zones separate
 *stopped riding* from *rode easy*.
 
-Two honest limits. The buckets sum to **0.80 of ride duration** on average, not 1.0 — paused and
-strapless time is in neither — so they are drawn as a share of recorded time, labelled, never as
-a share of the ride. And nothing before 2024 has them, so the zone view states its own range
-rather than inheriting the screen's.
+*Built as* a five-row share table on Trends over the selected period, with the span of equal
+length before it for comparison. One row per zone rather than the stacked weekly bar sketched
+here first: `.share-row` draws a single fill, so a stack would have meant a new component, and
+the period control already supplies the time dimension. The columns were filled by
+`npx tsx src/cli.ts backfill`, which reads the stored list payloads and touches no network —
+the data had been on disk since the first import.
 
-*Dashboard:* one stacked share bar per week, reusing the existing `.share-row` / `.share-fill`
-pattern from the Trends type tables. No new chart component.
+Three limits are stated on screen rather than smoothed over. The buckets cover **0.80 of ride
+duration** across the history and about 0.9 recently, because paused and strapless time falls
+into none of them, so the figures are shares of recorded time and never of the ride. A ride
+carrying a partial set is dropped rather than having its gaps read as zero. And zone coverage
+differs between spans, so a period and the one before it are comparable **by share, not by
+hours** — the note under the table says so, with both ride counts.
+
+Still open: the bpm boundaries behind the zones. They need
+`/biometric-service/heartRateZones/v2` from **B** below, so the rows are labelled "Zone 1" … 
+"Zone 5" rather than by heart rate.
 
 **A2 — Short-duration power without a FIT download.** `maxAvgPower_1, _2, _5, _10, _20, _30,
 _60, _120, _300` are populated on **all 135 powered rides**. The project spends a ~335 MB FIT

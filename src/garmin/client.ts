@@ -109,6 +109,12 @@ export interface ActivityListItem {
   avgPower: number | null;
   normPower: number | null;
   calories: number | null;
+  /** Seconds in each heart-rate zone. Absent on rides recorded without a strap. */
+  hrTimeInZone_1: number | null;
+  hrTimeInZone_2: number | null;
+  hrTimeInZone_3: number | null;
+  hrTimeInZone_4: number | null;
+  hrTimeInZone_5: number | null;
 }
 
 export interface ActivitySummary {
