@@ -61,7 +61,7 @@ export function Trends() {
           <p className="finding">
             {rows.length === 0
               ? 'No days in this range yet.'
-              : `Training load over ${range.label.toLowerCase()}, and the best power held at each duration. Load covers every ride; power covers only the rides with a power meter.`}
+              : `Training load over ${range.label.toLowerCase()}, and the best power held at each duration.`}
           </p>
         </div>
         <div className="title-actions">

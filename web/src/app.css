@@ -4,8 +4,13 @@
    bottom edges, 16px corners, a 1px edge, no shadow anywhere.
 
    Its face: IBM Plex Mono on every figure. A training log is read the way a head unit is
-   read — watts, load points, bpm, kilometres down a column — so the numbers get their own
+   read, watts, load points, bpm, kilometres down a column, so the numbers get their own
    drawing and the prose stays in IBM Plex Sans.
+
+   The frame is tinted one low-chroma step of the accent. At #f9fbfc against a white sheet
+   the step was about 1% and the move did not read: sidebar, top bar and sheet looked like
+   one white field, and every section needed a box of its own to exist. The tint does the
+   separating now, so the sections inside the sheet carry no border at all.
 
    Grid arithmetic at 1440:
      sheet   = 1440 − 228 sidebar − 8 inset            = 1204
@@ -15,10 +20,10 @@
    One gutter value, 24px, horizontally and vertically. */
 
 :root {
-  --ground: #f9fbfc;
+  --ground: #eaeff1;
   --surface: #ffffff;
   --raised: #f4f6f8;
-  --active: #ebedee;
+  --active: #dde4e6;
   --border: #e8eaec;
   --rule: #f0f1f2;
   --control: #cdced1;
@@ -54,7 +59,7 @@
 
   --fs-title: 22px;
   --fs-section: 16px;
-  --fs-kpi: 28px;
+  --fs-kpi: 24px;
   --fs-body: 14px;
   --fs-small: 12px;
 
@@ -434,22 +439,22 @@ h1 {
   align-items: start;
 }
 
+/* With no borders the gap is the separator, so it is larger than any gap inside a
+   section. The grid's 24px gutter still runs between the two columns. */
 .column {
   display: flex;
   flex-direction: column;
-  gap: var(--gap);
+  gap: 40px;
   min-width: 0;
 }
 
 /* ---------------- cards ---------------- */
 
+/* Frame, sheet, section. The third level is space, not another box: on a white sheet a
+   white card can only exist by its border, and six of them read as a form, not a page. */
 .card {
   display: flex;
   flex-direction: column;
-  padding: var(--card-pad);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
 }
 
 .card-head {
@@ -457,7 +462,7 @@ h1 {
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .card-title {
@@ -472,12 +477,7 @@ h1 {
 }
 
 .card-foot {
-  margin-top: auto;
-  padding-top: 16px;
-}
-
-.card-foot .btn-quiet {
-  width: 100%;
+  margin-top: 14px;
 }
 
 .chart-note {
@@ -512,13 +512,19 @@ h1 {
   color: var(--muted);
 }
 
-/* The mono sets a decimal point wide; at 28px "2.4" needs pulling together. */
+/* The mono sets a decimal point wide; at this size "2.4" needs pulling together. */
 .kpi-value {
   margin-top: 4px;
   font-size: var(--fs-kpi);
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.045em;
+}
+
+/* The screen asks whether he is getting fitter, so fitness is the figure that answers it:
+   32 against the siblings' 24, the 1.3 the study's lead figures keep. */
+.kpi-lead .kpi-value {
+  font-size: 32px;
 }
 
 /* The unit stays in the figure's own face: a value never changes typeface mid-line. */
@@ -853,7 +859,7 @@ code {
 }
 
 .skeleton-value {
-  height: 28px;
+  height: 24px;
   width: 64px;
   margin-top: 4px;
 }
@@ -987,9 +993,25 @@ code {
     padding: 16px;
   }
 
-  /* A table becomes a list of two-line rows; no field is dropped. */
+  /* The table keeps every column and scrolls inside its own frame, so the page never
+     scrolls sideways. At 560px the twelve columns were about 45px each and the ride
+     names were cut to a single letter, which is the one column that may never be cut. */
   .table-scroll table {
-    min-width: 560px;
+    min-width: 880px;
+  }
+
+  /* The date stays in view while the figures scroll past it. */
+  /* `top` is reset: the base rule sticks the header 48px down the page, and inheriting
+     that here pushed the first header cell out of its own row and off the screen. */
+  .table-scroll th:first-child,
+  .table-scroll td:first-child {
+    position: sticky;
+    top: auto;
+    left: 0;
+    z-index: 1;
+    padding-right: 12px;
+    white-space: nowrap;
+    background: var(--surface);
   }
 
   .seg {

@@ -49,7 +49,7 @@ export function Activities() {
           <h1>Activities</h1>
           <p className="finding">
             Every ride imported from Garmin, newest first. A dash means the sensor was not
-            there. It is never a zero, and the ride is never dropped.
+            there, never a zero.
           </p>
         </div>
       </div>

@@ -87,20 +87,12 @@ export function Overview() {
                 Fitness is <strong className="fig">{num(fitness)}</strong> points
                 {change != null && (
                   <>
-                    , <strong className="fig">{signed(change)}</strong> on twelve weeks ago (
-                    <span className="fig">{num(thenFitness)}</span>)
+                    , <strong className="fig">{signed(change)}</strong> on twelve weeks ago
                   </>
                 )}
-                . Form is <strong className="fig">{signed(form ?? 0)}</strong>, so you carry{' '}
+                . Form <strong className="fig">{signed(form ?? 0)}</strong>:{' '}
                 {(form ?? 0) > 15 ? 'little' : (form ?? 0) > -10 ? 'moderate' : 'heavy'} fatigue
                 into today.
-                {unmeasured > 0 && (
-                  <>
-                    {' '}
-                    <span className="fig">{num(unmeasured)}</span> of the last 90 days had a ride
-                    the model could not measure, so the curve runs below the real work there.
-                  </>
-                )}
               </>
             )}
           </p>
@@ -112,6 +104,7 @@ export function Overview() {
           <div className="kpis">
             <Kpi
               label="Fitness"
+              lead
               value={num(fitness)}
               note={
                 change == null ? (
@@ -129,7 +122,7 @@ export function Overview() {
             <Kpi
               label="Form"
               value={form == null ? DASH : signed(form)}
-              note="Fitness minus fatigue. Above zero is fresh."
+              note="Fitness minus fatigue, lagged a day. Above zero is fresh."
             />
             <Kpi
               label="This week"
@@ -259,7 +252,7 @@ export function Overview() {
               {recent.length === 0 && <p className="state">No rides imported yet.</p>}
             </div>
             <div className="card-foot">
-              <a className="btn-quiet" href="#activities">
+              <a className="link" href="#activities">
                 View all {num(coverage?.total)} rides
               </a>
             </div>
@@ -291,8 +284,7 @@ export function Overview() {
                   <KeyValue label="With a power-based TSS" value={num(coverage.withTss)} />
                 </div>
                 <p className="chart-note">
-                  Both kinds are counted rather than averaged in, and every day within 42 of one is
-                  marked, because those days feed the same window.
+                  Both kinds are counted rather than averaged in.
                 </p>
               </>
             )}
@@ -324,7 +316,7 @@ export function Overview() {
               ))}
             </div>
             <div className="card-foot">
-              <a className="btn-quiet" href="#trends">
+              <a className="link" href="#trends">
                 The whole curve
               </a>
             </div>
@@ -352,14 +344,17 @@ function Kpi({
   value,
   unit,
   note,
+  lead,
 }: {
   label: string;
   value: string;
   unit?: string;
   note?: React.ReactNode;
+  /** The figure that answers the screen's question. One per screen. */
+  lead?: boolean;
 }) {
   return (
-    <div className="kpi">
+    <div className={lead ? 'kpi kpi-lead' : 'kpi'}>
       <div className="kpi-label">{label}</div>
       <div className="kpi-value fig">
         {value}
