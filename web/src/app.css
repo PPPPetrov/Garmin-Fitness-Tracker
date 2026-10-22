@@ -1,0 +1,540 @@
+/* Achromatic ledger — seed 607929889.
+   No colour in the chrome. The one chart hue sits on the fitness curve, which is the
+   answer to this screen's question; everything else is ink and grey. */
+
+:root {
+  --ground: #f2f4f7;
+  --surface: #ffffff;
+  --raised: #eeeeee;
+  --border: #e6e6e6;
+  --rule: #f0f0f0;
+  --control: #d4d4d4;
+  --text: #0a0a0a;
+  --muted: #6b6b6b;
+  --accent: #141414;
+  --positive: #2e7d32;
+  --negative: #c4242a;
+  --chart-ink: #141414;
+  --chart-grey: #8a8a8a;
+  --chart-hue: #1d5fbf;
+  --grid: #e5e5e5;
+
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --row-height: 44px;
+  --sidebar-width: 240px;
+  --gap: 12px;
+  --pad: 24px;
+  --control-height: 36px;
+  --fs-title: 24px;
+  --fs-section: 16px;
+  --fs-kpi: 30px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: 'Geist', Inter, system-ui, sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 500;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* ---------- shell: open plane, no top bar ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 32px 12px 16px;
+}
+
+.brand {
+  padding: 0 12px 24px;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.brand-sub {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.nav-group-label {
+  padding: 0 12px;
+  margin: 22px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 32px;
+  margin-bottom: 2px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-size: var(--fs-body);
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: #e9e9e9;
+  color: var(--text);
+}
+
+.nav-item[aria-current='page'] {
+  background: #e9e9e9;
+  color: var(--text);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.nav-count {
+  font-size: var(--fs-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 12px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+/* ---------- canvas ---------- */
+
+.canvas {
+  padding: 32px 32px 64px 20px;
+  min-width: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: var(--fs-title);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.finding {
+  max-width: 68ch;
+  margin-bottom: 28px;
+  color: var(--muted);
+}
+
+.finding strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.title-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn {
+  height: var(--control-height);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: #2e2e2e;
+}
+
+.btn:disabled {
+  background: var(--control);
+  cursor: not-allowed;
+}
+
+.btn-quiet {
+  height: var(--control-height);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.btn-quiet:hover {
+  background: var(--raised);
+}
+
+.btn:focus-visible,
+.btn-quiet:focus-visible,
+.seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- sections and cards ---------- */
+
+.section {
+  margin-bottom: 48px;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.section-note {
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+
+.card {
+  padding: var(--pad);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.card-head {
+  margin-bottom: 20px;
+}
+
+.card-title {
+  font-size: var(--fs-section);
+  font-weight: 500;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--gap);
+}
+
+/* ---------- KPI strip: type, not tiles ---------- */
+
+.kpi-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--gap);
+}
+
+.kpi {
+  padding: var(--pad);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.kpi-label {
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.kpi-value {
+  margin-top: 6px;
+  font-size: var(--fs-kpi);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.kpi-unit {
+  margin-left: 4px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+
+.kpi-note {
+  margin-top: 6px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.delta-up {
+  color: var(--positive);
+}
+
+.delta-down {
+  color: var(--negative);
+}
+
+/* ---------- tables ---------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  padding: 0 10px 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  height: var(--row-height);
+  padding: 0 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr:hover {
+  background: #fafafa;
+}
+
+.num {
+  text-align: right;
+}
+
+th.num {
+  text-align: right;
+}
+
+.dash {
+  color: var(--muted);
+}
+
+.sub {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+/* ---------- segmented control ---------- */
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.seg button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.seg button[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.field {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font: inherit;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ---------- coverage bar: how much of a period had a power meter ---------- */
+
+.coverage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.coverage-track {
+  width: 56px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+.coverage-fill {
+  height: 100%;
+  background: var(--chart-ink);
+}
+
+/* ---------- states ---------- */
+
+.state {
+  padding: 48px var(--pad);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.state-error {
+  color: var(--negative);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* ---------- phone ---------- */
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    height: 48px;
+    padding: 0 8px;
+    overflow-x: auto;
+    background: var(--ground);
+  }
+
+  .brand,
+  .nav-group-label,
+  .sidebar-foot,
+  .nav-count {
+    display: none;
+  }
+
+  .nav-item {
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .canvas {
+    padding: 20px 16px 48px;
+  }
+
+  .split,
+  .kpi-strip {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-flow: row;
+  }
+
+  /* An odd last cell spans the row rather than leaving half of it empty. */
+  .kpi-strip > :last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .section-head {
+    flex-wrap: wrap;
+    gap: 4px 16px;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  .table-scroll table {
+    min-width: 640px;
+  }
+}
