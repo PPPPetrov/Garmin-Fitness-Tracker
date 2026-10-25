@@ -140,11 +140,13 @@ npm test          # node:test via tsx
 npm run typecheck
 ```
 
-49 tests over the four parts that are easy to get quietly wrong: the load model, where today's
-form sits, the heart-rate zone totals, and FIT handling. What each one pins down is described in
+The test suite covers the parts that are easy to get quietly wrong: the load model, where today's
+form sits, the heart-rate zone totals, FIT handling, and the planning projection. What each one
+pins down is described in
 [`docs/load-model.md`](docs/load-model.md#what-the-tests-pin-down),
-[`docs/load-model.md`](docs/load-model.md#what-the-form-tests-pin-down) and
-[`docs/architecture.md`](docs/architecture.md#fit-files).
+[`docs/load-model.md`](docs/load-model.md#what-the-form-tests-pin-down),
+[`docs/architecture.md`](docs/architecture.md#fit-files) and
+[`docs/planning.md`](docs/planning.md#what-the-tests-pin-down).
 
 ## Documentation
 

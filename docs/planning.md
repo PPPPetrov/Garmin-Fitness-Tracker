@@ -38,8 +38,13 @@ A scenario is an event date and two phases:
 A taper is 100% until a date and 50% from it. A rest is 0% from today. A block is 125% and
 then 75%. The code does not know which of these is which, and none is suggested. With nothing
 chosen the screen starts from the **default scenario**: rest from today, 28 days ahead. The
-same applies when the saved event has already passed: the controls start from the default, and
-the screen says the saved date has gone by.
+same applies when the saved event has already passed, or is today: the controls start from the
+default, and the screen says the saved date has gone by when it has.
+
+A saved plan whose switch date has gone by, but whose event is still ahead, is projected with
+its switch at today. That is the same projection, because every day left already takes the
+after share, and it keeps the controls on a scenario that can be saved again. The stored row
+keeps the date as typed, and an untouched plan still reads as saved.
 
 Only one plan can be saved, with an optional name of up to 60 characters. It is kept in the
 `plan` table and nothing else is stored: the projection is recomputed on every request and
@@ -98,8 +103,7 @@ from a state that was.
 
 `lessSureUntil` is the first day the 42-day window is clear of the last unmeasured ride, or
 null when no projected day is affected. On 25 October 2026 it is 4 December. It can fall after
-the event, and then the event itself is less sure. The chart shades the days it covers and
-the screen says how long it lasts.
+the event, and then the event itself is less sure. The screen says how long it lasts.
 
 ## The usual reading is low
 
@@ -151,6 +155,8 @@ of unmeasured rides is shown under "What this rests on".
   saved plan round-trips with a null name and stays one row;
 - a plan in the past falls back to the default and is named, and a plan whose event is today
   is neither past nor current;
+- a saved plan whose switch has gone by is projected and reported with its switch at today,
+  the same as that plan saved with its switch at today, and its stored row is unchanged;
 - a query overrides the saved plan without touching it, and a cleared plan is forgotten.
 
 [`src/routes/planning.test.ts`](../src/routes/planning.test.ts):
