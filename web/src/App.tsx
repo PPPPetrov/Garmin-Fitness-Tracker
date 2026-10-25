@@ -5,12 +5,14 @@ import { DatabaseIcon, MenuIcon, SearchIcon, SyncIcon } from './ui';
 import { Activities } from './views/Activities';
 import { Overview } from './views/Overview';
 import { Performance } from './views/Performance';
+import { Planning } from './views/Planning';
 import { Trends } from './views/Trends';
 
 const VIEWS = [
   { id: 'overview', label: 'Overview' },
   { id: 'trends', label: 'Trends' },
   { id: 'performance', label: 'Performance' },
+  { id: 'planning', label: 'Planning' },
   { id: 'activities', label: 'Activities' },
 ] as const;
 
@@ -76,6 +78,15 @@ function NavIcon({ id }: { id: ViewId }) {
         <path d="M2.25 12.25a5.75 5.75 0 1 1 11.5 0" />
         <path d="M8 12.25 10.75 7.5" />
         <path d="M4.25 8.5l.75.5M8 4.5v.9M11.75 8.5l-.75.5" />
+      </svg>
+    );
+  }
+  if (id === 'planning') {
+    /* A flag on a pole: the day being planned towards. */
+    return (
+      <svg {...common}>
+        <path d="M3.25 14.25V1.75" />
+        <path d="M3.25 2.5h9.5l-2 3 2 3h-9.5" />
       </svg>
     );
   }
@@ -219,6 +230,7 @@ export function App() {
           {view === 'overview' && <Overview />}
           {view === 'trends' && <Trends />}
           {view === 'performance' && <Performance />}
+          {view === 'planning' && <Planning />}
           {view === 'activities' && <Activities search={search} onSearch={setSearch} />}
         </main>
       </div>

@@ -16,9 +16,11 @@ import { performanceReport } from './calc/performance.js';
 import { zonesInRange } from './calc/zones.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
+import { planningRoutes } from './routes/planning.js';
 import { syncActivities } from './sync/import.js';
 
 const app = new Hono();
+app.route('/api/planning', planningRoutes());
 
 let syncInFlight: Promise<unknown> | null = null;
 

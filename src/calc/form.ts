@@ -12,6 +12,7 @@
  * fitness over the same window so that a fresh number can be told from a detrained one.
  */
 
+import type Database from 'better-sqlite3';
 import { db } from '../db/index.js';
 import { countAtOrBelow, fifthOf, flooredPercentile, lastBeforeRun } from './rank.js';
 
@@ -62,6 +63,31 @@ function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Where one form value falls among the measured forms, which must be ascending.
+ * The rider's own history is the only yardstick: no threshold is involved.
+ */
+export function placeForm(
+  sorted: readonly number[],
+  form: number,
+): { percentile: number; band: FormBand; rank: number } {
+  const percentile = flooredPercentile(sorted, form);
+  return {
+    percentile,
+    band: BANDS[fifthOf(percentile)]!,
+    rank: sorted.length - countAtOrBelow(sorted, form) + 1,
+  };
+}
+
+/** The forms of every measured (non-warm-up) day in the stored series, ascending. */
+export function measuredForms(database: Database.Database = db()): number[] {
+  return (
+    database
+      .prepare(`SELECT form FROM daily_load WHERE is_warmup = 0 ORDER BY form`)
+      .all() as { form: number }[]
+  ).map((row) => row.form);
+}
+
 export function formPosition(days: readonly FormDay[]): FormPosition | null {
   const measured = days.filter((d) => !d.isWarmup);
   const today = measured[measured.length - 1];
@@ -70,10 +96,10 @@ export function formPosition(days: readonly FormDay[]): FormPosition | null {
   const sorted = measured.map((d) => d.form).sort((a, b) => a - b);
   const n = sorted.length;
 
-  const percentileOf = (form: number) => flooredPercentile(sorted, form);
-  const bandOf = (form: number): FormBand => BANDS[fifthOf(percentileOf(form))]!;
+  const bandOf = (form: number): FormBand => placeForm(sorted, form).band;
 
-  const band = bandOf(today.form);
+  const placed = placeForm(sorted, today.form);
+  const band = placed.band;
 
   /* A day at exactly zero is carrying no fatigue, so it belongs to the fresh side and
      does not break a run. */
@@ -97,8 +123,8 @@ export function formPosition(days: readonly FormDay[]): FormPosition | null {
     date: today.date,
     form: today.form,
     fitness: today.fitness,
-    percentile: percentileOf(today.form),
-    rank: n - countAtOrBelow(sorted, today.form) + 1,
+    percentile: placed.percentile,
+    rank: placed.rank,
     measuredDays: n,
     band,
     streak,

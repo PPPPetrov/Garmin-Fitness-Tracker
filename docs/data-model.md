@@ -3,8 +3,9 @@
 One SQLite file, `data/garmin.db`, in WAL mode. The schema is
 [`src/db/schema.sql`](../src/db/schema.sql), applied idempotently on every connection.
 
-Six tables. Every one keeps enough provenance to trace a number on screen back to the ride and
-the API response it came from.
+Seven tables. The six that come from Garmin each keep enough provenance to trace a number on
+screen back to the ride and the API response it came from. The seventh, `plan`, holds only
+what the rider typed.
 
 ```
 activity ──┬── activity_raw   the untouched API responses
@@ -13,6 +14,7 @@ activity ──┬── activity_raw   the untouched API responses
 
 daily_load   one row per calendar day, recomputed wholesale
 sync_run     one row per sync attempt
+plan         the one saved plan, as the rider typed it
 ```
 
 ## `activity`
@@ -151,6 +153,24 @@ One row per sync attempt: `started_at`, `finished_at`, `mode` (`full` or `increm
 
 `/api/status` returns the newest row, which is what the dashboard's freshness stamp is built
 from.
+
+## `plan`
+
+The one plan saved on the Planning screen. **At most one row**: `id` is the primary key and a
+check constraint holds it to 1, so saving replaces the plan rather than adding one.
+
+| Column | Notes |
+| --- | --- |
+| `id` | Always 1. |
+| `name` | Optional, up to 60 characters. `NULL` when none was given. |
+| `event_date` | The day being planned towards. |
+| `switch_date` | The first day `after_pct` applies. Kept as typed, even once it has gone by. |
+| `before_pct`, `after_pct` | Shares of the usual load: 0, 25, 50, 75, 100, 125 or 150. |
+| `updated_at` | When the plan was last saved. |
+
+It holds what the rider typed and nothing derived: the projection is recomputed on every
+request and never stored. **Sync and recompute never read or write it**, so a full re-import
+leaves the plan alone. See [`planning.md`](planning.md).
 
 ## Migrations
 

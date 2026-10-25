@@ -476,6 +476,92 @@ h1 {
   color: var(--muted);
 }
 
+/* A track that takes the full width, its options sharing it: seven shares fit in 366px. */
+.seg-fill {
+  display: flex;
+  width: 100%;
+}
+
+.seg-fill button {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+
+/* A text button: an action that is not the point of the card, such as clearing a plan. */
+.text-button {
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.text-button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.text-button:disabled {
+  cursor: progress;
+}
+
+.text-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A form in a card: each control with its label above it, full width. */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.control .caption {
+  margin-top: 0;
+}
+
+.control-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.control .field {
+  width: 100%;
+  min-width: 0;
+}
+
+.control-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.control-actions .caption {
+  margin-top: 0;
+}
+
+.control-actions .text-button {
+  margin-left: auto;
+}
+
 /* "See details →": the one way out of a card, set in ink so it reads as an action. */
 .more {
   display: inline-flex;
@@ -1550,6 +1636,11 @@ code {
   .toolbar .field {
     flex: 1;
     min-width: 0;
+  }
+
+  /* The date inputs take the full card width. */
+  .control-pair {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* The table keeps every column and scrolls inside its own frame; the ride name is the

@@ -146,6 +146,12 @@ it is not something arithmetic over Garmin's load figures can know.
 - the bands come from the rider's own distribution: the same absolute form lands in the top
   fifth of one history and the bottom fifth of another.
 
+## Projecting it forward
+
+The Planning screen carries these same series past today under an assumed load. It calls
+`computeLoadSeries` on the history plus the assumed days, so there is one formula, not two,
+and it never writes to `daily_load`. See [`planning.md`](planning.md).
+
 ## What the model is not
 
 - **Not a recovery measurement.** It describes training you have already done. Garmin's own

@@ -4,6 +4,7 @@ import { openDatabase } from '../db/index.js';
 import {
   addDays,
   computeLoadSeries,
+  dailyInputs,
   FATIGUE_TIME_CONSTANT_DAYS,
   FITNESS_TIME_CONSTANT_DAYS,
   UNRELIABLE_LOAD_SQL,
@@ -198,5 +199,29 @@ describe('UNRELIABLE_LOAD_SQL', () => {
       assert.equal(flagged.has(ride.id), ride.bad, `${ride.label} (#${ride.id})`);
     }
     database.close();
+  });
+});
+
+describe('dailyInputs', () => {
+  it('groups the rides by day and counts the ones whose load cannot be trusted', () => {
+    const database = openDatabase(':memory:');
+    const insert = database.prepare(
+      `INSERT INTO activity (activity_id, activity_type, start_time_local, local_date,
+                             duration_s, avg_hr, activity_training_load, imported_at)
+       VALUES (?, 'road_biking', '2024-01-01 09:00:00', ?, ?, ?, ?, '2024-01-01')`,
+    );
+    insert.run(1, '2024-01-01', 3600, 140, 40);
+    insert.run(2, '2024-01-01', 3600, null, 60);
+    insert.run(3, '2024-01-02', 3600, 140, 50);
+
+    const inputs = dailyInputs(database)!;
+
+    assert.equal(inputs.from, '2024-01-01');
+    assert.deepEqual(inputs.perDay.get('2024-01-01'), { load: 100, rides: 2, unmeasured: 1 });
+    assert.deepEqual(inputs.perDay.get('2024-01-02'), { load: 50, rides: 1, unmeasured: 0 });
+  });
+
+  it('is null when there are no rides', () => {
+    assert.equal(dailyInputs(openDatabase(':memory:')), null);
   });
 });
