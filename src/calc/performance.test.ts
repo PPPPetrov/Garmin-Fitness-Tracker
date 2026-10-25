@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { openDatabase } from '../db/index.js';
 import { addDays } from './load.js';
 import {
   CP_DURATIONS_S,
@@ -7,6 +8,7 @@ import {
   efficiencyReading,
   fitCriticalPower,
   median,
+  performanceReport,
   rampPosition,
   type CurveEffort,
   type EfficiencyRide,
@@ -262,5 +264,36 @@ describe('rampPosition', () => {
     const fitness = Array.from({ length: 45 }, (_, i) => i);
     assert.equal(rampPosition(rampSpine(fitness, { warmup: 42 })), null);
     assert.equal(rampPosition([]), null);
+  });
+});
+
+describe('performanceReport', () => {
+  it('leaves a held-back ride out of critical power and counts it', () => {
+    const database = openDatabase(':memory:');
+    const addRide = (id: number, date: string, status: string, watts: number) => {
+      database
+        .prepare(
+          `INSERT INTO activity (activity_id, activity_type, start_time_local, local_date, imported_at)
+           VALUES (?, 'road_biking', ?, ?, ?)`,
+        )
+        .run(id, `${date} 09:00:00`, date, date);
+      database
+        .prepare(`INSERT INTO fit_file (activity_id, status, updated_at) VALUES (?, ?, ?)`)
+        .run(id, status, date);
+      database
+        .prepare(`INSERT INTO power_curve (activity_id, duration_s, watts) VALUES (?, 1200, ?)`)
+        .run(id, watts);
+    };
+    addRide(1, '2026-10-01', 'parsed', 240);
+    addRide(2, '2026-10-05', 'pending', 400);
+
+    const report = performanceReport(database, '2026-10-25');
+
+    assert.deepEqual(report.criticalPower.window.bests, [
+      { durationS: 1200, watts: 240, date: '2026-10-01' },
+    ]);
+    assert.equal(report.heldBack, 1);
+    assert.equal(report.ramp, null);
+    assert.equal(report.efficiency.rides, 0);
   });
 });

@@ -12,7 +12,9 @@
  * trainer with a mountain road.
  */
 
-import { addDays } from './load.js';
+import type Database from 'better-sqlite3';
+import { db } from '../db/index.js';
+import { addDays, powerCurveHeldBack, today as todayIso } from './load.js';
 import { countAtOrBelow, fifthOf, flooredPercentile, lastBeforeRun } from './rank.js';
 
 export const EFFICIENCY_TYPE = 'road_biking';
@@ -323,5 +325,92 @@ export function rampPosition(days: readonly RampDay[]): RampPosition | null {
     band,
     lastInBand: lastIndex >= 0 ? measured[lastIndex]!.date : null,
     estimated: today.isEstimated,
+  };
+}
+
+export interface PerformanceReport {
+  efficiency: EfficiencyReading;
+  criticalPower: CriticalPowerReading;
+  ramp: RampPosition | null;
+  /** Rides with a curve on file that the Garmin cross-check holds out of the records. */
+  heldBack: number;
+  formula: { efficiency: string; criticalPower: string; ramp: string };
+}
+
+/** Everything the Performance screen shows, read from the database and computed on request. */
+export function performanceReport(
+  database: Database.Database = db(),
+  today: string = todayIso(),
+): PerformanceReport {
+  const rides = database
+    .prepare(
+      `SELECT local_date, activity_type, normalized_power, avg_hr, moving_duration_s
+         FROM activity WHERE normalized_power IS NOT NULL`,
+    )
+    .all() as {
+    local_date: string;
+    activity_type: string;
+    normalized_power: number | null;
+    avg_hr: number | null;
+    moving_duration_s: number | null;
+  }[];
+
+  const efforts = database
+    .prepare(
+      `SELECT p.activity_id, a.local_date, p.duration_s, p.watts
+         FROM power_curve p
+         JOIN activity a ON a.activity_id = p.activity_id
+         JOIN fit_file f ON f.activity_id = p.activity_id AND f.status = 'parsed'
+        WHERE p.duration_s IN (${CP_DURATIONS_S.join(', ')})`,
+    )
+    .all() as { activity_id: number; local_date: string; duration_s: number; watts: number }[];
+
+  const ftp = database
+    .prepare(
+      `SELECT local_date, ftp_at_ride FROM activity
+        WHERE ftp_at_ride IS NOT NULL ORDER BY local_date`,
+    )
+    .all() as { local_date: string; ftp_at_ride: number }[];
+
+  const days = database
+    .prepare(`SELECT local_date, fitness, is_warmup, is_estimated FROM daily_load ORDER BY local_date`)
+    .all() as { local_date: string; fitness: number; is_warmup: number; is_estimated: number }[];
+
+  return {
+    efficiency: efficiencyReading(
+      rides.map((r) => ({
+        date: r.local_date,
+        type: r.activity_type,
+        normalizedPower: r.normalized_power,
+        avgHr: r.avg_hr,
+        movingS: r.moving_duration_s,
+      })),
+      today,
+    ),
+    criticalPower: criticalPowerReading(
+      efforts.map((e) => ({
+        activityId: e.activity_id,
+        date: e.local_date,
+        durationS: e.duration_s,
+        watts: e.watts,
+      })),
+      ftp.map((f) => ({ date: f.local_date, watts: f.ftp_at_ride })),
+      today,
+    ),
+    ramp: rampPosition(
+      days.map((d) => ({
+        date: d.local_date,
+        fitness: d.fitness,
+        isWarmup: d.is_warmup === 1,
+        isEstimated: d.is_estimated === 1,
+      })),
+    ),
+    heldBack: powerCurveHeldBack(undefined, undefined, database),
+    formula: {
+      efficiency:
+        'median of normalized power / average heart rate, road rides with at least 30 min moving, by month',
+      criticalPower: 'least-squares fit of work = CP·t + W′ to the 90-day bests at 2, 5, 10 and 20 min',
+      ramp: 'fitness(d) − fitness(d − 7), ranked against every measured day',
+    },
   };
 }

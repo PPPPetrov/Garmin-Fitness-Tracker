@@ -12,6 +12,7 @@ import {
   recomputeDailyLoad,
   today,
 } from './calc/load.js';
+import { performanceReport } from './calc/performance.js';
 import { zonesInRange } from './calc/zones.js';
 import { config } from './config.js';
 import { db } from './db/index.js';
@@ -194,6 +195,8 @@ app.get('/api/activities/:id', (c) => {
 
   return c.json({ activity, powerCurve: curve, fit: fit ?? null });
 });
+
+app.get('/api/performance', (c) => c.json(performanceReport()));
 
 app.get('/api/power-curve', (c) => {
   const since = c.req.query('since');
