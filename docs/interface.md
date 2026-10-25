@@ -94,7 +94,7 @@ The search in the top bar finds rides by name or place, so it always answers on 
 typing anywhere moves there and filters as you type. On a phone the top bar has no room for
 it and the field sits in the Activities title row instead, bound to the same value.
 
-On Performance the efficiency chart is the one line chart whose scale does not reach zero (): its values sit between about 1.1 and 1.3 watts per beat, and against zero that movement flattens into a line. Every load chart keeps zero, so it reads from nothing.
+On Performance the efficiency chart is the one line chart whose scale does not reach zero (`includeZero={false}`): its values sit between about 1.1 and 1.3 watts per beat, and against zero that movement flattens into a line. Every load chart keeps zero, so it reads from nothing.
 
 ## Definitions live in the info mark
 

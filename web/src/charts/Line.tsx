@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { useWidth } from './useWidth';
 import { linePath } from './linePath';
+import { niceScale } from './scale';
 
 export interface Series {
   name: string;
@@ -36,24 +37,6 @@ interface Props {
    * movement would flatten into a line against it.
    */
   includeZero?: boolean;
-}
-
-/** Round, even steps with the top tick above the maximum. */
-function niceScale(min: number, max: number): { lo: number; hi: number; ticks: number[] } {
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
-    return { lo: 0, hi: 1, ticks: [0, 1] };
-  }
-  const span = max - min;
-  const rawStep = span / 4;
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const step =
-    [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= rawStep) ?? magnitude * 10;
-
-  const lo = Math.floor(min / step) * step;
-  const hi = Math.ceil((max + step * 0.01) / step) * step;
-  const ticks: number[] = [];
-  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v * 1000) / 1000);
-  return { lo, hi, ticks };
 }
 
 export function LineChart({

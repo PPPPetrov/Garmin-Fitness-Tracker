@@ -319,7 +319,6 @@ export function Trends() {
                 </div>
               )}
             </Card>
-  
             <Card
               title="Rides the model cannot trust"
               info="No training load at all, or no heart-rate strap on a ride over ten minutes, as a share of each type's own rides."
