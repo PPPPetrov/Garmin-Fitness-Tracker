@@ -345,6 +345,84 @@ type the model cannot trust.
 
 ---
 
+## `GET /api/planning`
+
+Where form and fitness go between now and an event, if the rider rides a given share of
+their usual load before and after a switch day. Computed on each request.
+
+With no parameters it projects the saved plan, or the default scenario (rest from today for
+28 days) when there is none or its event has passed. With all four of the parameters below
+it projects that scenario **without saving it**; this is what the controls call while the
+rider tries things out.
+
+| Parameter | Meaning |
+| --- | --- |
+| `event` | Event date, `YYYY-MM-DD`, after today and within 180 days. |
+| `switch` | First day the `after` share applies: today or later, and not after `event`. |
+| `before` | Percent of usual load on days before the switch: 0, 25, 50, 75, 100, 125 or 150. |
+| `after` | The same, for the switch day onward. |
+
+```json
+{
+  "plan": { "name": "Gran fondo", "eventDate": "2026-11-15", "switchDate": "2026-11-01",
+            "beforePct": 50, "afterPct": 0 },
+  "scenario": { "eventDate": "2026-11-15", "switchDate": "2026-11-01",
+                "beforePct": 50, "afterPct": 0, "source": "saved" },
+  "past": null,
+  "start": { "date": "2026-10-24", "fitness": 73.3, "fatigue": 40.1, "form": 33.2 },
+  "usual": { "perDay": 38.2, "perWeek": 267.4, "rides": 80, "unmeasured": 2,
+             "from": "2026-09-27", "to": "2026-10-24" },
+  "series": [ { "date": "2026-09-13", "fitness": 71.0, "fatigue": 60.2, "form": 10.8,
+                "projected": false, "estimated": false } ],
+  "event": { "date": "2026-11-15", "form": 31.5, "fitness": 52.0, "fitnessChange": -21.3,
+             "percentile": 97, "band": "freshest", "rank": 40, "measuredDays": 1430 },
+  "turnsPositive": "2026-10-27",
+  "peak": { "date": "2026-11-14", "form": 33.0, "fitness": 53.1 },
+  "switchDay": { "date": "2026-11-01", "form": 20.4, "fitness": 63.0 },
+  "formula": "…"
+}
+```
+
+- `plan` is the saved row as stored, or `null`. `scenario` is what was projected, and
+  `source` says which it was: `saved`, `query` or `default`.
+- `past` is the saved event's date when that date has gone by, otherwise `null`. `plan` still
+  carries it and the default scenario is projected.
+- `series` holds 42 days of history, then today up to the event date. `projected` is true on
+  days whose load is assumed rather than recorded.
+- The body is `null` (status 200) when there is no history, or no complete day to start from.
+- Status codes: 200; 400 with `{ "error": "…" }`, one sentence naming the first wrong
+  parameter, for a bad value or for some but not all four parameters.
+
+---
+
+## `PUT /api/planning`
+
+Saves the one plan, replacing any earlier one, and returns the same body as `GET` with no
+parameters.
+
+```json
+{ "name": "Gran fondo", "eventDate": "2026-11-15", "switchDate": "2026-11-01",
+  "beforePct": 50, "afterPct": 0 }
+```
+
+The fields are checked against the same rules as the query. `name` is optional, at most 60
+characters; it is trimmed, and an empty name is stored as `null`.
+
+- 200 with the report.
+- 400 with `{ "error": "…" }` for a body that is not a JSON object, a field of the wrong type,
+  or a value the rules reject. A rejected plan leaves the saved one unchanged.
+- 415 with `{ "error": "Send the plan as JSON." }` when `Content-Type` is not
+  `application/json`. The server listens on localhost only, and the JSON-only rule keeps a
+  plain cross-site form post from writing to it.
+
+---
+
+## `DELETE /api/planning`
+
+Removes the saved plan. Returns 204 with no body, whether or not there was one.
+
+---
+
 ## Errors
 
 A failed query propagates as a 500 with Hono's default body. There is no structured error
