@@ -13,6 +13,7 @@ import {
   watts,
 } from '../format';
 import { Card, Delta } from '../ui';
+import { noEstimateReason } from './performanceCopy';
 
 /** The screen's question: is my body getting stronger, not just busier? */
 export function Performance() {
@@ -150,7 +151,7 @@ export function Performance() {
                 />
                 <p className="note">
                   {latest?.cp == null ? (
-                    'No powered ride in the last 90 days, so there is no estimate for now.'
+                    `${noEstimateReason(latest?.rides ?? 0)}, so there is no estimate for now.`
                   ) : (
                     <>
                       From <span className="fig">{num(latest.rides)}</span> rides in the 90 days to{' '}
@@ -326,7 +327,7 @@ export function performanceFinding({ efficiency, criticalPower, ramp }: Performa
 function criticalPowerCaption(
   latest: PerformanceReport['criticalPower']['months'][number] | null,
 ): ReactNode {
-  if (latest?.cp == null || latest.wPrimeJ == null) return 'No powered ride in the last 90 days';
+  if (latest?.cp == null || latest.wPrimeJ == null) return noEstimateReason(latest?.rides ?? 0);
   const wPrime = `W′ ${(latest.wPrimeJ / 1000).toFixed(1)} kJ`;
   if (latest.garminFtp == null) return wPrime;
   const gap = Math.round(latest.cp) - Math.round(latest.garminFtp);

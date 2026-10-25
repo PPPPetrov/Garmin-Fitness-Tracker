@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { useWidth } from './useWidth';
+import { linePath } from './linePath';
 
 export interface Series {
   name: string;
@@ -108,17 +109,7 @@ export function LineChart({
 
   /** Straight segments, broken wherever the data is missing rather than interpolated. */
   function path(values: (number | null)[]): string {
-    let d = '';
-    let pen = false;
-    values.forEach((v, i) => {
-      if (v == null) {
-        pen = false;
-        return;
-      }
-      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`;
-      pen = true;
-    });
-    return d;
+    return linePath(values.map((v, i) => (v == null ? null : { x: x(i), y: y(v) })));
   }
 
   function onMove(event: React.PointerEvent<SVGSVGElement>) {

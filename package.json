@@ -33,7 +33,7 @@
     "web": "vite",
     "dev": "concurrently -n api,web -c cyan,magenta \"npm:server\" \"npm:web\"",
     "build": "vite build",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test src/**/*.test.ts web/src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
