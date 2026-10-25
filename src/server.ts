@@ -226,28 +226,6 @@ app.get('/api/seasons', (c) => {
   return c.json({ throughMonthDay, rows });
 });
 
-/**
- * The dated steps in Garmin's own threshold estimate. Every powered ride carries the FTP
- * in effect on its date, so the history is already in the activity table; this reduces it
- * to the days the figure actually changed.
- */
-app.get('/api/ftp', (c) => {
-  const rides = db()
-    .prepare(
-      `SELECT local_date, ftp_at_ride AS watts FROM activity
-        WHERE ftp_at_ride IS NOT NULL ORDER BY local_date`,
-    )
-    .all() as { local_date: string; watts: number }[];
-
-  const steps: { from: string; watts: number }[] = [];
-  for (const ride of rides) {
-    if (steps[steps.length - 1]?.watts !== ride.watts) {
-      steps.push({ from: ride.local_date, watts: ride.watts });
-    }
-  }
-  return c.json({ steps });
-});
-
 app.get('/api/types', (c) => {
   const rows = db()
     .prepare(

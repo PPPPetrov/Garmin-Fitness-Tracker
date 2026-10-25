@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import {
   useApi,
-  type Async,
-  type FtpStep,
   type LoadDay,
-  type PowerCurve,
   type RideType,
   type Season,
   type Week,
@@ -14,8 +11,6 @@ import {
 import { LineChart, LineLegend } from '../charts/Line';
 import {
   DASH,
-  durationLabel,
-  heldBackNote,
   isoDaysAgo,
   longDate,
   monthYear,
@@ -24,7 +19,6 @@ import {
   shortDate,
   signed,
   typeName,
-  watts,
 } from '../format';
 import { Card } from '../ui';
 
@@ -33,6 +27,10 @@ const RANGES = [
   { id: '1y', label: '1 year', phrase: 'the last year', days: 365 },
   { id: 'all', label: 'All', phrase: 'the whole history', days: 3000 },
 ] as const;
+
+/* As tall as the two share cards stacked beside it, so the row ends on one line with no
+   empty space under the chart. */
+const FORM_PLOT_HEIGHT = 480;
 
 /** One hue, laddered from easy to hard: the zones are ordered, so their colour is too. */
 const ZONE_FILL = [
@@ -43,27 +41,16 @@ const ZONE_FILL = [
   'var(--accent-ink)',
 ];
 
-/** The screen's question: how has the load moved over this period, and what are my bests? */
+/** The screen's question: how has the load moved over this period? */
 export function Trends() {
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[1]);
   const from = isoDaysAgo(range.days);
 
-  /* A season in progress is held against the same span of the one before it, so both
-     the volume table and the power table stop on the same day of the year. */
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const year = Number(todayIso.slice(0, 4));
-  const monthDay = todayIso.slice(4);
-
   const load = useApi<{ rows: LoadDay[] }>(`/api/load?from=${from}`, [range.id]);
   const weeks = useApi<{ rows: Week[] }>(`/api/weeks?from=${from}`, [range.id]);
   const types = useApi<{ rows: RideType[] }>('/api/types');
-  const ftp = useApi<{ steps: FtpStep[] }>('/api/ftp');
   const seasons = useApi<{ rows: Season[] }>('/api/seasons');
   const zones = useApi<ZoneReading>(`/api/zones?from=${from}`, [range.id]);
-  const thisSeason = useApi<PowerCurve>(`/api/power-curve?since=${year}-01-01`);
-  const lastSeason = useApi<PowerCurve>(
-    `/api/power-curve?since=${year - 1}-01-01&to=${year - 1}${monthDay}`,
-  );
 
   const rows = load.state === 'ready' ? load.data.rows : [];
   const wide = range.days > 200;
@@ -85,30 +72,7 @@ export function Trends() {
   const biggest = [...weekRows].sort((a, b) => b.hours - a.hours).slice(0, 5);
   const typeRows = types.state === 'ready' ? types.data.rows : [];
 
-  /* Garmin dates every change it makes to the estimate, so the line is a true step:
-     for each day in the range, the figure that was in effect on it. A day before the
-     first powered ride has none, and stays null rather than becoming a zero. */
-  const steps = ftp.state === 'ready' ? ftp.data.steps : [];
-  const ftpByDay = rows.map((day) => {
-    let inForce: number | null = null;
-    for (const step of steps) {
-      if (step.from > day.local_date) break;
-      inForce = step.watts;
-    }
-    return inForce;
-  });
-  const ftpNow = ftpByDay.length > 0 ? ftpByDay[ftpByDay.length - 1] : null;
-  const ftpThen = ftpByDay.find((w): w is number => w != null) ?? null;
-
   const seasonRows = seasons.state === 'ready' ? seasons.data.rows : [];
-  const powerBySeason = PEAK_DURATIONS.map((duration) => ({
-    duration,
-    now: peakAt(thisSeason, duration),
-    before: peakAt(lastSeason, duration),
-  })).filter((p) => p.now != null || p.before != null);
-  const heldBack =
-    (thisSeason.state === 'ready' ? thisSeason.data.heldBack : 0) +
-    (lastSeason.state === 'ready' ? lastSeason.data.heldBack : 0);
   /* The bar and the percentage beside it are the same number, so a row can never say
      two things: here the share of all rides, below the share of that type's own rides. */
   const typeTotal = typeRows.reduce((sum, t) => sum + t.n, 0);
@@ -121,7 +85,7 @@ export function Trends() {
           <p className="subtitle">
             {rows.length === 0
               ? 'No days in this range yet.'
-              : `Training load over ${range.phrase}, and the best power held at each duration.`}
+              : `Training load over ${range.phrase}.`}
           </p>
         </div>
         <div className="title-actions">
@@ -311,13 +275,13 @@ export function Trends() {
             info="Fitness minus fatigue, lagged a day. Above the dashed line you are fresh; below it you are carrying the week's work."
           >
             {load.state === 'loading' && (
-              <div className="skeleton skeleton-plot" style={{ height: 300 }} />
+              <div className="skeleton skeleton-plot" style={{ height: FORM_PLOT_HEIGHT }} />
             )}
             {load.state === 'ready' && rows.length > 0 && (
               <LineChart
                 labels={axisLabels}
                 tipLabels={tipLabels}
-                height={300}
+                height={FORM_PLOT_HEIGHT}
                 yUnit="points"
                 reference={{ value: 0 }}
                 format={(v) => signed(Math.round(v))}
@@ -333,63 +297,54 @@ export function Trends() {
             )}
           </Card>
 
-          <Card
-            title="Best power by season"
-            info="This year against the same months of last year, from the original ride files. Only rides with a power meter are in it."
-            aside={`${year} against ${year - 1}`}
-            flush
-          >
-            {powerBySeason.length === 0 ? (
-              <p className="state" style={{ margin: 16 }}>
-                No ride files parsed yet. Run <code>npm run sync:fit</code> to download them.
-              </p>
-            ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Duration</th>
-                    <th className="num">{year}</th>
-                    <th className="num">{year - 1}</th>
-                    <th className="num">Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {powerBySeason.map((p) => (
-                    <tr key={p.duration}>
-                      <td style={{ fontWeight: 500 }}>{durationLabel(p.duration)}</td>
-                      <td className="num" style={{ fontWeight: 600 }}>
-                        {p.now == null ? <span className="dash">{DASH}</span> : `${watts(p.now)} W`}
-                      </td>
-                      <td className="num">
-                        {p.before == null ? (
-                          <span className="dash">{DASH}</span>
-                        ) : (
-                          `${watts(p.before)} W`
-                        )}
-                      </td>
-                      <td className="num">
-                        {p.now == null || p.before == null ? (
-                          <span className="dash">{DASH}</span>
-                        ) : (
-                          /* The difference of the two figures as displayed, not of the
-                             raw ones: 268.5 and 226.3 are shown as 269 and 226, and a
-                             change of 42 beside them does not close. */
-                          <span className={p.now < p.before ? 'bad' : 'good'}>
-                            {signed(Math.round(p.now) - Math.round(p.before))}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+          <div className="column">
+            <Card
+              title="Rides by type"
+              info="All time, as a share of every ride. Mountain biking is most of the riding and none of it carries a power meter."
+              aside="All time"
+            >
+              {typeRows.length === 0 ? (
+                <p className="state">No rides imported yet.</p>
+              ) : (
+                <div className="bars">
+                  {typeRows.map((t) => (
+                    <ShareBar
+                      key={t.activity_type}
+                      label={typeName(t.activity_type)}
+                      share={t.n / Math.max(1, typeTotal)}
+                      shareText={pct(t.n, typeTotal)}
+                      figure={num(t.n)}
+                    />
                   ))}
-                </tbody>
-              </table>
-            )}
-            {heldBack > 0 && (
-              <p className="note" style={{ margin: '4px 16px 12px' }}>
-                {heldBackNote(heldBack)}
-              </p>
-            )}
-          </Card>
+                </div>
+              )}
+            </Card>
+  
+            <Card
+              title="Rides the model cannot trust"
+              info="No training load at all, or no heart-rate strap on a ride over ten minutes, as a share of each type's own rides."
+            >
+              {typeRows.length === 0 ? (
+                <p className="state">No rides imported yet.</p>
+              ) : (
+                <div className="bars">
+                  {typeRows.map((t) => {
+                    const bad = t.no_load + t.no_strap;
+                    return (
+                      <ShareBar
+                        key={t.activity_type}
+                        label={typeName(t.activity_type)}
+                        share={bad / Math.max(1, t.n)}
+                        shareText={pct(bad, t.n)}
+                        figure={num(bad)}
+                        muted
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
 
         <div className="grid grid-1-1">
@@ -482,101 +437,10 @@ export function Trends() {
           </Card>
         </div>
 
-        <div className="grid grid-1-1-1">
-          <Card
-            title="Threshold power"
-            info="Garmin's own estimate, as it stood on each ride. It steps up after a hard effort and drifts down when none is recorded, so a fall here is not always lost form."
-            aside={
-              ftpNow != null && (
-                <span>
-                  <span className="fig" style={{ color: 'var(--text)', fontWeight: 600 }}>
-                    {watts(ftpNow)} W
-                  </span>
-                  {ftpThen != null && ftpThen !== ftpNow && (
-                    <>
-                      {' · '}
-                      <span className={ftpNow < ftpThen ? 'bad' : 'good'}>
-                        {signed(ftpNow - ftpThen)}
-                      </span>
-                    </>
-                  )}
-                </span>
-              )
-            }
-          >
-            {ftp.state === 'error' && <p className="state state-error">{ftp.message}</p>}
-            {ftp.state === 'loading' && (
-              <div className="skeleton skeleton-plot" style={{ height: 200 }} />
-            )}
-            {ftp.state === 'ready' &&
-              (ftpByDay.some((w) => w != null) ? (
-                <LineChart
-                  labels={axisLabels}
-                  tipLabels={tipLabels}
-                  height={200}
-                  yUnit="watts"
-                  format={(v) => `${Math.round(v)} W`}
-                  series={[{ name: 'FTP', colour: 'var(--chart-1)', width: 2, values: ftpByDay }]}
-                />
-              ) : (
-                <p className="state">No powered ride in this range, so no estimate to draw.</p>
-              ))}
-          </Card>
-
-          <Card
-            title="Rides by type"
-            info="All time, as a share of every ride. Mountain biking is most of the riding and none of it carries a power meter."
-            aside="All time"
-          >
-            {typeRows.length === 0 ? (
-              <p className="state">No rides imported yet.</p>
-            ) : (
-              <div className="bars">
-                {typeRows.map((t) => (
-                  <ShareBar
-                    key={t.activity_type}
-                    label={typeName(t.activity_type)}
-                    share={t.n / Math.max(1, typeTotal)}
-                    shareText={pct(t.n, typeTotal)}
-                    figure={num(t.n)}
-                  />
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card
-            title="Rides the model cannot trust"
-            info="No training load at all, or no heart-rate strap on a ride over ten minutes, as a share of each type's own rides."
-          >
-            {typeRows.length === 0 ? (
-              <p className="state">No rides imported yet.</p>
-            ) : (
-              <div className="bars">
-                {typeRows.map((t) => {
-                  const bad = t.no_load + t.no_strap;
-                  return (
-                    <ShareBar
-                      key={t.activity_type}
-                      label={typeName(t.activity_type)}
-                      share={bad / Math.max(1, t.n)}
-                      shareText={pct(bad, t.n)}
-                      figure={num(bad)}
-                      muted
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        </div>
       </div>
     </>
   );
 }
-
-/** The six durations a rider actually talks about. */
-const PEAK_DURATIONS = [5, 60, 300, 600, 1200, 3600];
 
 /**
  * Whether the shape has moved, against the span of equal length immediately before this
@@ -603,11 +467,6 @@ function zoneNote({ period, previous }: ZoneReading): React.ReactNode {
       )}
     </>
   );
-}
-
-function peakAt(curve: Async<PowerCurve>, duration: number): number | null {
-  if (curve.state !== 'ready') return null;
-  return curve.data.rows.find((r) => r.duration_s === duration)?.watts ?? null;
 }
 
 function ShareBar({

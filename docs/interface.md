@@ -83,7 +83,7 @@ Each answers one question, and the biggest block on it is the answer.
 | Screen | Question | Shape |
 | --- | --- | --- |
 | Overview | Am I fitter than I was, and how much fatigue am I carrying into today? | Four KPI cards; the fitness and fatigue chart beside the form gauge; the load calendar and the coverage ring beside the ten most recent rides; weekly hours beside best power |
-| Trends | How has the load moved over this period, and what are my best powers? | A range track in the title row; six KPI cards; training load beside the zones; form beside power by season; season and biggest-week tables; threshold power, ride types and untrusted rides |
+| Trends | How has the load moved over this period? | A range track in the title row; six KPI cards; training load beside the zones; form beside ride types stacked over untrusted rides; season and biggest-week tables |
 | Performance | Is my body getting stronger, not just busier? | Three KPI cards (critical power, efficiency, ramp rate); critical power beside Garmin's FTP, next to power by season; efficiency by month beside the efforts and rides these rest on. No range control |
 | Activities | Find the ride I am thinking of. | A type filter in the title row, one card holding the table, paging in its footer with the range stated |
 

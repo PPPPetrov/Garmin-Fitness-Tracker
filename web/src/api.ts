@@ -123,12 +123,6 @@ export interface Season {
   load_points: number;
 }
 
-/** A day Garmin's threshold estimate changed, and what it changed to. */
-export interface FtpStep {
-  from: string;
-  watts: number;
-}
-
 async function get<T>(path: string): Promise<T> {
   const response = await fetch(path);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);

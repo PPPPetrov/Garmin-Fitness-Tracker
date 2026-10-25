@@ -248,8 +248,8 @@ The best power ever held at each duration, with the ride that set it.
 
 One row per duration, ascending. Durations with no data are absent rather than zero.
 
-Both bounds together are what make a season comparable with the one before it: the Trends
-screen asks for this year, then for last year stopped on today's day of the year. A peak
+Both bounds together are what make a season comparable with the one before it: the
+Performance screen asks for this year, then for last year stopped on today's day of the year. A peak
 held over ten months against one held over twelve is not a comparison.
 
 ---
@@ -315,22 +315,6 @@ Newest year first. The cutoff is today's month and day, so a season in progress 
 against the same span of the ones before it rather than against their full twelve months.
 The first year of the history is short for the same honest reason: it begins on the day
 the account does.
-
----
-
-## `GET /api/ftp`
-
-The dated steps in Garmin's own threshold estimate.
-
-```json
-{ "steps": [ { "from": "2025-11-15", "watts": 189 }, { "from": "2026-01-25", "watts": 200 } ] }
-```
-
-Every powered ride carries the FTP in effect on its date, so no history table is needed:
-this reduces those rides to the days the figure changed. `from` is the first ride that
-carried the new value, which is the day it is known to have been in effect, not
-necessarily the day Garmin decided it. The estimate falls as well as rises — it drifts
-down when no hard effort is recorded — so a step down is not necessarily lost fitness.
 
 ---
 
