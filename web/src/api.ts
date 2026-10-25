@@ -123,8 +123,10 @@ export interface Season {
   load_points: number;
 }
 
+/** A 400 carries the server's one sentence about the input; anything else, its status. */
 async function get<T>(path: string): Promise<T> {
   const response = await fetch(path);
+  if (response.status === 400) throw await failure(response);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return (await response.json()) as T;
 }
