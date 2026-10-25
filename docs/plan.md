@@ -259,7 +259,9 @@ what this data can support. Each has its own spec and plan under [`superpowers/`
 1. **Performance. Built 25 October 2026.** Efficiency on road rides, critical power beside
    Garmin's FTP, and ramp rate against the rider's own weeks, on a fourth screen. Trends now
    covers load only. See [`performance.md`](performance.md).
-2. **Planning ahead.** Form projected forward to a chosen date. Next.
+2. **Planning ahead. Built 25 October 2026.** Form and fitness projected forward to a chosen
+   date under a share of the rider's usual load, on a fifth screen. See
+   [`planning.md`](planning.md).
 3. **Motivation.** Records and yearly bests, the Eddington number (64 km today), a year in
    review, goals.
 

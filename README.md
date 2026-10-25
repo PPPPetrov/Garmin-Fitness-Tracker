@@ -40,6 +40,13 @@ efficiency (normalized power per heartbeat, on road rides), critical power fitte
 90-day best efforts and drawn beside Garmin's own FTP, and the weekly ramp in fitness placed
 against the rider's own weeks. The maths is in [`docs/performance.md`](docs/performance.md).
 
+**Projects form forward.** Pick an event date and a share of your own usual load (rest, half,
+the usual, more) and the Planning screen carries fitness, fatigue and form to that day with the
+same arithmetic as the load model, drawn in a paler line so it is not mistaken for a
+measurement. It says how long the projection stays less sure, given the unmeasured rides in the
+last 42 days. It is not a forecast and no scenario is suggested. The maths is in
+[`docs/planning.md`](docs/planning.md).
+
 **Breaks the riding down by heart-rate zone**, which is the only intensity measure here that
 reaches the mountain biking, where there is no power meter. Garmin reports five buckets per ride
 in the activity list; they sit on 264 of 423 rides and on none before 2024. The figures are
@@ -52,13 +59,14 @@ Garmin returns a figure about eight times too low instead of returning nothing. 
 counted rather than quietly averaged in, every day within 42 days of one is marked, and the
 dashboard draws those days as open columns rather than solid ones.
 
-**Serves four screens** on `localhost`:
+**Serves five screens** on `localhost`:
 
 | Screen | The question it answers |
 | --- | --- |
 | Overview | Am I fitter than I was, and how much fatigue am I carrying into today? |
 | Trends | How has the load moved over this period, and what are my best powers? |
 | Performance | Is my body getting stronger, not just busier? |
+| Planning | Where would my form be on the day, if I rode this much until then? |
 | Activities | Find the ride I am thinking of. |
 
 ## Requirements
@@ -144,6 +152,7 @@ form sits, the heart-rate zone totals, and FIT handling. What each one pins down
 | --- | --- |
 | [`docs/architecture.md`](docs/architecture.md) | How the pieces fit: the import pipeline, the Garmin client, FIT handling, configuration, the layout of the source |
 | [`docs/performance.md`](docs/performance.md) | Efficiency, critical power and ramp rate: the rules, the data limits, and what the tests pin down |
+| [`docs/planning.md`](docs/planning.md) | The projection: the scenario, the even-spread assumption, where it is less sure, and what the tests pin down |
 | [`docs/load-model.md`](docs/load-model.md) | The fitness and fatigue maths, the warm-up window, how unreliable rides are handled, and what the tests pin down |
 | [`docs/data-model.md`](docs/data-model.md) | Every table and column, and why each one exists |
 | [`docs/api.md`](docs/api.md) | The local HTTP API: every endpoint, its parameters and its response shape |

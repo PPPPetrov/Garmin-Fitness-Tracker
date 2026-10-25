@@ -85,6 +85,7 @@ Each answers one question, and the biggest block on it is the answer.
 | Overview | Am I fitter than I was, and how much fatigue am I carrying into today? | Four KPI cards; the fitness and fatigue chart beside the form gauge; the load calendar and the coverage ring beside the ten most recent rides; weekly hours beside best power |
 | Trends | How has the load moved over this period? | A range track in the title row; six KPI cards; training load beside the zones; form beside ride types stacked over untrusted rides; season and biggest-week tables |
 | Performance | Is my body getting stronger, not just busier? | Three KPI cards (critical power, efficiency, ramp rate); critical power beside Garmin's FTP, next to power by season; efficiency by month beside the efforts and rides these rest on. No range control |
+| Planning | Where would my form be on the day, if I rode this much until then? | Three KPI cards (form and fitness on the day, what is left to go); the projection chart beside the scenario controls; what happens along the way beside what the figures rest on. One saved plan |
 | Activities | Find the ride I am thinking of. | A type filter in the title row, one card holding the table, paging in its footer with the range stated |
 
 Under the title of each sits **the finding** — the one fact in today's data that most needs
@@ -133,6 +134,7 @@ Hand-drawn SVG in `web/src/charts/`, measured in real pixels with a `ResizeObser
 - **Hover** on a line chart draws a guide, a ring on each series and a tooltip naming the day.
 - **Annotate the event that matters**: a 2px pale marker and a 12px label in a row reserved
   above the plot, and only when there is a label to put there.
+- **A projection is drawn in the pale step of its series, continuous with the history.**
 - **A period still in progress is drawn pale**: this week's bar, until the week is over.
 - On a phone a plot is no taller than 200–220px, so the next card starts on the same screen.
 
