@@ -142,7 +142,7 @@ export function Planning() {
   const eventRow = series[series.length - 1];
   const lessSure = eventRow?.estimated ? ' · less sure' : '';
   const name = cleanName(draft.name);
-  const unsaved = isUnsaved(draft, report.plan);
+  const unsaved = isUnsaved(draft, report.plan, today);
   const queryError = latest.state === 'error' && !stale ? latest.message : null;
 
   return (
@@ -337,11 +337,15 @@ export function Planning() {
   );
 }
 
-/** The first draft of the controls: the saved plan while its event is ahead, else what was projected. */
+/**
+ * The first draft of the controls: what was projected, named after the saved plan when that
+ * is what was projected. The dates come from the projection, so a saved switch that has gone
+ * by reads as today, as the server projected it.
+ */
 function draftFrom(report: PlanningReport): SavedPlan {
-  if (report.plan && report.past == null) return { ...report.plan };
-  const { eventDate, switchDate, beforePct, afterPct } = report.scenario;
-  return { name: null, eventDate, switchDate, beforePct, afterPct };
+  const { eventDate, switchDate, beforePct, afterPct, source } = report.scenario;
+  const name = source === 'saved' ? (report.plan?.name ?? null) : null;
+  return { name, eventDate, switchDate, beforePct, afterPct };
 }
 
 /** A blank name is no name. */
@@ -350,13 +354,18 @@ function cleanName(name: string | null): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/** Whether the controls differ from the saved plan in any field. With no plan, always. */
-function isUnsaved(draft: SavedPlan, plan: SavedPlan | null): boolean {
+/**
+ * Whether the controls differ from the saved plan in any field. With no plan, always. A
+ * saved switch that has gone by counts as today, as the server projects it, so an untouched
+ * plan in its after phase reads as saved.
+ */
+function isUnsaved(draft: SavedPlan, plan: SavedPlan | null, today: string): boolean {
   if (!plan) return true;
+  const planSwitch = plan.switchDate < today ? today : plan.switchDate;
   return (
     cleanName(draft.name) !== cleanName(plan.name) ||
     draft.eventDate !== plan.eventDate ||
-    draft.switchDate !== plan.switchDate ||
+    draft.switchDate !== planSwitch ||
     draft.beforePct !== plan.beforePct ||
     draft.afterPct !== plan.afterPct
   );
@@ -415,7 +424,7 @@ function ProjectionChart({
           width: 1.5,
           values: series.map((d) => d.fitness),
           paleFrom,
-          paleColour: 'var(--border)',
+          paleColour: 'var(--control)',
         },
         {
           name: 'Form',

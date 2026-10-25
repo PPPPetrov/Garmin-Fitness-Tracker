@@ -77,6 +77,28 @@ describe('scenarioClause', () => {
   });
 });
 
+describe('scenarioClause / one phase', () => {
+  it('names only the before phase when the switch is the event day', () => {
+    const s = { ...rest, eventDate: '2026-11-29', switchDate: '2026-11-29', beforePct: 50, afterPct: 0 };
+    assert.equal(scenarioClause(s, TODAY), 'If you ride half your usual until 28 Nov');
+  });
+
+  it('names the before phase until the eve even when it is the usual load', () => {
+    const s = { ...rest, eventDate: '2026-11-29', switchDate: '2026-11-29', beforePct: 100, afterPct: 25 };
+    assert.equal(scenarioClause(s, TODAY), 'If you ride your usual until 28 Nov');
+  });
+
+  it('says the phase once, from today, when both shares are the same', () => {
+    const s = { ...rest, switchDate: '2026-11-01', beforePct: 50, afterPct: 50 };
+    assert.equal(scenarioClause(s, TODAY), 'If you ride half your usual from today');
+  });
+
+  it('says rest from today when both shares are rest', () => {
+    const s = { ...rest, switchDate: '2026-11-01' };
+    assert.equal(scenarioClause(s, TODAY), 'If you rest from today');
+  });
+});
+
 describe('planningFinding', () => {
   it('reports the event for a taper', () => {
     assert.equal(
@@ -100,6 +122,22 @@ describe('planningFinding', () => {
   it('reports the peak for a rest scenario', () => {
     assert.equal(
       planningFinding(report({ scenario: rest }), TODAY),
+      'If you rest from today, form peaks at +47.7 on 6 Nov, and fitness falls to 56.9 by then.',
+    );
+  });
+
+  it('reports the event when the switch is the event day, though the after share is rest', () => {
+    const scenario = { ...rest, eventDate: '2026-11-29', switchDate: '2026-11-29', beforePct: 50, afterPct: 0 };
+    assert.equal(
+      planningFinding(report({ scenario }), TODAY),
+      'If you ride half your usual until 28 Nov, form on 29 Nov is +23.3, fresher than 91% of your days, with fitness 63.0, 13.0 under yesterday.',
+    );
+  });
+
+  it('reports the peak when both shares are rest and the switch is later', () => {
+    const scenario = { ...rest, switchDate: '2026-11-01' };
+    assert.equal(
+      planningFinding(report({ scenario }), TODAY),
       'If you rest from today, form peaks at +47.7 on 6 Nov, and fitness falls to 56.9 by then.',
     );
   });

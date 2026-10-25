@@ -425,6 +425,24 @@ describe('plan storage and planningReport', () => {
     database.close();
   });
 
+  it('projects a saved plan whose switch has passed from today, and leaves the row alone', () => {
+    const database = seeded();
+    const plan = saved({ switchDate: addDays(TODAY, -3), beforePct: 50, afterPct: 25 });
+    savePlan(plan, database);
+    const aged = planningReport(null, database, TODAY)!;
+    assert.equal(aged.scenario.source, 'saved');
+    assert.equal(aged.scenario.switchDate, TODAY);
+    assert.deepEqual(aged.plan, plan);
+    assert.deepEqual(readPlan(database), plan);
+
+    savePlan({ ...plan, switchDate: TODAY }, database);
+    const current = planningReport(null, database, TODAY)!;
+    const { plan: _agedPlan, ...agedRest } = aged;
+    const { plan: _currentPlan, ...currentRest } = current;
+    assert.deepEqual(agedRest, currentRest);
+    database.close();
+  });
+
   it('falls back to the default for a plan in the past, and names it', () => {
     const database = seeded();
     const yesterday = addDays(TODAY, -1);

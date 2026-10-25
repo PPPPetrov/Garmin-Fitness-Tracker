@@ -358,7 +358,8 @@ export function clearPlan(database: Database.Database = db()): void {
 
 /**
  * The projection for a query scenario, else the saved plan if its event is still ahead,
- * else the default. Null when there is no history, or no complete day to project from.
+ * else the default. A saved switch date that has gone by is projected, and reported, as
+ * today. Null when there is no history, or no complete day to project from.
  * The query is not validated here; the route does that.
  */
 export function planningReport(
@@ -376,9 +377,12 @@ export function planningReport(
     scenario = query;
     source = 'query';
   } else if (plan && plan.eventDate > today) {
+    /* A switch that has gone by is today: every day left already takes the after share,
+       so the projection is the same, and the scenario stays one the rider could save. The
+       stored row keeps the date as typed. */
     scenario = {
       eventDate: plan.eventDate,
-      switchDate: plan.switchDate,
+      switchDate: plan.switchDate < today ? today : plan.switchDate,
       beforePct: plan.beforePct,
       afterPct: plan.afterPct,
     };

@@ -17,15 +17,28 @@ function dayBefore(iso: string): string {
 }
 
 /**
- * The scenario as the start of a sentence. When the before phase is the usual load, or the
- * switch is today so there is no before phase, only the after phase and its date are named.
+ * The scenario as the start of a sentence. Only the phases that hold a day are named, and a
+ * share that does not change is said once:
+ * - the same share before and after: that share from today;
+ * - the switch today, so there is no before phase: the after phase from today;
+ * - the switch on the event day, so there is no after phase: the before phase until the eve;
+ * - the usual load before the switch: the after phase from the switch;
+ * - otherwise both phases, the first ending the day before the switch.
  */
 export function scenarioClause(s: PlanScenario, today: string): string {
-  if (s.switchDate === today || s.beforePct === 100) {
-    const from = s.switchDate === today ? 'today' : shortDate(s.switchDate);
-    return `If you ${phaseText(s.afterPct)} from ${from}`;
+  if (s.beforePct === s.afterPct || s.switchDate === today) {
+    return `If you ${phaseText(s.afterPct)} from today`;
   }
+  if (s.switchDate === s.eventDate) {
+    return `If you ${phaseText(s.beforePct)} until ${shortDate(dayBefore(s.eventDate))}`;
+  }
+  if (s.beforePct === 100) return `If you ${phaseText(s.afterPct)} from ${shortDate(s.switchDate)}`;
   return `If you ${phaseText(s.beforePct)} until ${shortDate(dayBefore(s.switchDate))}, then ${phaseText(s.afterPct)}`;
+}
+
+/** The share the scenario ends on: the after share, or the before share when the after phase is empty. */
+function finalPct(s: PlanScenario): number {
+  return s.switchDate === s.eventDate ? s.beforePct : s.afterPct;
 }
 
 /** Where the event's form sits in the rider's own history, as a caption. */
@@ -37,13 +50,14 @@ export function formCaption(e: PlanningReport['event']): string {
 
 /**
  * The one sentence the screen leads with. A scenario that ends in rest reports its peak, any
- * other the event day. A saved event that has gone by is said first.
+ * other the event day. It ends on the before share when the switch is the event day, so the
+ * after share is then not what decides. A saved event that has gone by is said first.
  */
 export function planningFinding(r: PlanningReport, today: string): string {
   const clause = scenarioClause(r.scenario, today);
   const prefix = r.past ? `Your event on ${shortDate(r.past)} has passed. ` : '';
 
-  if (r.scenario.afterPct === 0) {
+  if (finalPct(r.scenario) === 0) {
     return (
       `${prefix}${clause}, form peaks at ${signed(r.peak.form, 1)} on ${shortDate(r.peak.date)}, ` +
       `and fitness falls to ${num(r.peak.fitness, 1)} by then.`
