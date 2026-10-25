@@ -7,8 +7,10 @@ import {
   efficiencyReading,
   fitCriticalPower,
   median,
+  rampPosition,
   type CurveEffort,
   type EfficiencyRide,
+  type RampDay,
 } from './performance.js';
 
 /** A qualifying road ride at the given efficiency: heart rate 100, so NP is EF × 100. */
@@ -192,5 +194,73 @@ describe('criticalPowerReading', () => {
     const reading = criticalPowerReading([], [], TODAY);
     assert.deepEqual(reading.months, []);
     assert.deepEqual(reading.window.bests, []);
+  });
+});
+
+/** A continuous spine of days from 2024-01-01 carrying the given fitness values. */
+function rampSpine(
+  fitness: number[],
+  options: { warmup?: number; estimated?: number[] } = {},
+): RampDay[] {
+  const estimated = new Set(options.estimated ?? []);
+  return fitness.map((f, i) => ({
+    date: addDays('2024-01-01', i),
+    fitness: f,
+    isWarmup: i < (options.warmup ?? 0),
+    isEstimated: estimated.has(i),
+  }));
+}
+
+/**
+ * Fitness built so day i (from 7 on) carries ramp `ramps[i - 7]`: each day is the one a
+ * week before plus that day's ramp.
+ */
+function withRamps(ramps: number[]): number[] {
+  const fitness = Array.from({ length: 7 }, () => 50);
+  ramps.forEach((r, k) => fitness.push(fitness[k]! + r));
+  return fitness;
+}
+
+describe('rampPosition', () => {
+  it('takes the seven-day difference', () => {
+    const position = rampPosition(rampSpine(Array.from({ length: 20 }, (_, i) => 30 + i)))!;
+    assert.equal(position.perWeek, 7);
+    assert.equal(position.date, '2024-01-20');
+  });
+
+  it("skips days whose week-earlier day is warm-up", () => {
+    // Indices 0–3 are warm-up, so only 11, 12 and 13 are measured (their d − 7 is 4, 5, 6).
+    const fitness = withRamps([9, 9, 9, 9, 1, 2, 3]);
+    const position = rampPosition(rampSpine(fitness, { warmup: 4 }))!;
+    assert.equal(position.perWeek, 3);
+    assert.equal(position.percentile, 66);
+  });
+
+  it('floors the percentile and reports the share above', () => {
+    // Ramps 1..9, today 4: three below (33%), five above (55%).
+    const position = rampPosition(rampSpine(withRamps([1, 2, 3, 5, 6, 7, 8, 9, 4])))!;
+    assert.equal(position.percentile, 33);
+    assert.equal(position.percentAbove, 55);
+    assert.equal(position.band, 'low');
+  });
+
+  it('finds the last spell in the same fifth, not yesterday', () => {
+    // Lowest spell on days 7–9, a higher spell, then lowest again at the end.
+    const ramps = [-5, -5, -5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5, -5];
+    const position = rampPosition(rampSpine(withRamps(ramps)))!;
+    assert.equal(position.band, 'lowest');
+    assert.equal(position.lastInBand, addDays('2024-01-01', 9));
+  });
+
+  it('carries the estimated flag of the latest day', () => {
+    const fitness = Array.from({ length: 10 }, (_, i) => i);
+    assert.equal(rampPosition(rampSpine(fitness, { estimated: [9] }))!.estimated, true);
+    assert.equal(rampPosition(rampSpine(fitness, { estimated: [8] }))!.estimated, false);
+  });
+
+  it('returns null on a history no longer than the warm-up plus a week', () => {
+    const fitness = Array.from({ length: 45 }, (_, i) => i);
+    assert.equal(rampPosition(rampSpine(fitness, { warmup: 42 })), null);
+    assert.equal(rampPosition([]), null);
   });
 });

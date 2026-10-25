@@ -105,3 +105,42 @@ the series has a gap there.
 - The ride count is of distinct rides, not of durations.
 - On a tie the earlier ride holds the best.
 - No efforts gives an empty series, not an error.
+
+## Ramp rate
+
+How fast fitness is moving: today's fitness minus fitness seven days earlier, in Garmin load
+points per week. Fitness is the load model's 42-day average; see
+[`load-model.md`](load-model.md#the-formula).
+
+```
+ramp(d) = fitness(d) − fitness(d − 7)
+```
+
+A day is measured only when both `d` and `d − 7` are past the warm-up window. "Today" is the
+latest day the model holds, which is the last sync and not necessarily today's date; the screen
+names that day.
+
+**Placed against the rider's own weeks.** The usual ramp limits — five to eight a week — are
+written in TSS, a different scale from Garmin's load points, so they would be wrong here by an
+unknown factor. Ramp rate is read the way form is, as a rank in this rider's own distribution:
+
+- **percentile**: the share of measured days with a lower ramp, floored, so it never claims
+  every day.
+- **percentAbove**: the share with a higher ramp, floored. It reads a fall: "a steeper fall than
+  94% of your weeks".
+- **band**: the fifth of the distribution, from `lowest` to `highest`.
+- **lastInBand**: the last day before the current spell that was in the same fifth. The current
+  spell is skipped first, or the answer would always be yesterday.
+- **estimated**: copied from that day's `is_estimated`, so a week resting on an untrusted ride
+  is marked as less sure.
+
+The ranking arithmetic is shared with form in [`src/calc/rank.ts`](../src/calc/rank.ts).
+
+### What the ramp tests pin down
+
+- The ramp is the seven-day difference in fitness.
+- A day whose week-earlier day is in the warm-up is not measured.
+- The percentile is floored, and the share above is reported beside it.
+- The last day in the same fifth skips the current spell.
+- The estimated flag is the latest day's own.
+- A history no longer than the warm-up plus a week has no ramp, rather than a wrong one.

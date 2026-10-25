@@ -13,6 +13,7 @@
  */
 
 import { addDays } from './load.js';
+import { countAtOrBelow, fifthOf, flooredPercentile, lastBeforeRun } from './rank.js';
 
 export const EFFICIENCY_TYPE = 'road_biking';
 export const EFFICIENCY_MIN_MOVING_S = 1800;
@@ -264,5 +265,63 @@ export function criticalPowerReading(
   return {
     months,
     window: { from: addDays(today, -(CP_WINDOW_DAYS - 1)), to: today, bests: windowBests(efforts, today).bests },
+  };
+}
+
+export interface RampDay {
+  date: string;
+  fitness: number;
+  isWarmup: boolean;
+  isEstimated: boolean;
+}
+
+export type RampBand = 'lowest' | 'low' | 'middle' | 'high' | 'highest';
+
+const RAMP_BANDS: readonly RampBand[] = ['lowest', 'low', 'middle', 'high', 'highest'];
+
+export interface RampPosition {
+  /** The latest day the model holds, which is the last sync, not necessarily today. */
+  date: string;
+  /** Fitness gained over the last seven days, in load points. */
+  perWeek: number;
+  /** Share of measured days with a lower ramp, floored. */
+  percentile: number;
+  /** Share of measured days with a higher ramp, floored: "a steeper fall than q% of weeks". */
+  percentAbove: number;
+  band: RampBand;
+  /** The last day before the current spell that was in the same fifth. */
+  lastInBand: string | null;
+  estimated: boolean;
+}
+
+/**
+ * How fast fitness is moving, placed against every week this rider has measured. The
+ * usual ramp limits are written in TSS, a different scale from Garmin's load points, so
+ * the only honest reference is the rider's own history — the same reading form gets.
+ */
+export function rampPosition(days: readonly RampDay[]): RampPosition | null {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const measured: { date: string; ramp: number; isEstimated: boolean }[] = [];
+  for (const d of days) {
+    const weekBefore = byDate.get(addDays(d.date, -7));
+    if (!weekBefore || d.isWarmup || weekBefore.isWarmup) continue;
+    measured.push({ date: d.date, ramp: d.fitness - weekBefore.fitness, isEstimated: d.isEstimated });
+  }
+  const today = measured[measured.length - 1];
+  if (!today) return null;
+
+  const sorted = measured.map((m) => m.ramp).sort((a, b) => a - b);
+  const bandOf = (ramp: number) => RAMP_BANDS[fifthOf(flooredPercentile(sorted, ramp))]!;
+  const band = bandOf(today.ramp);
+  const lastIndex = lastBeforeRun(measured, (m) => bandOf(m.ramp) === band);
+
+  return {
+    date: today.date,
+    perWeek: Math.round(today.ramp * 100) / 100,
+    percentile: flooredPercentile(sorted, today.ramp),
+    percentAbove: Math.floor((100 * (sorted.length - countAtOrBelow(sorted, today.ramp))) / sorted.length),
+    band,
+    lastInBand: lastIndex >= 0 ? measured[lastIndex]!.date : null,
+    estimated: today.isEstimated,
   };
 }
