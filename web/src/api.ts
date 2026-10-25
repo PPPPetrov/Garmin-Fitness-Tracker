@@ -207,3 +207,96 @@ export interface PerformanceReport {
   heldBack: number;
   formula: { efficiency: string; criticalPower: string; ramp: string };
 }
+
+/** The Planning screen figures. Mirrors `PlanningReport` in src/calc/planning.ts. */
+export interface PlanScenario {
+  eventDate: string;
+  /** The first day the `afterPct` share applies. Days before it use `beforePct`. */
+  switchDate: string;
+  beforePct: number;
+  afterPct: number;
+}
+
+export interface SavedPlan extends PlanScenario {
+  name: string | null;
+}
+
+export interface PlanningDay {
+  date: string;
+  fitness: number;
+  fatigue: number;
+  form: number;
+  /** True for a day whose load is assumed rather than recorded. */
+  projected: boolean;
+  estimated: boolean;
+}
+
+export interface PlanningReport {
+  plan: SavedPlan | null;
+  scenario: PlanScenario & { source: 'saved' | 'query' | 'default' };
+  /** The saved event date when that date has already gone by, otherwise null. */
+  past: string | null;
+  start: { date: string; fitness: number; fatigue: number; form: number };
+  usual: {
+    perDay: number;
+    perWeek: number;
+    rides: number;
+    unmeasured: number;
+    from: string;
+    to: string;
+  };
+  series: PlanningDay[];
+  event: {
+    date: string;
+    form: number;
+    fitness: number;
+    fitnessChange: number;
+    percentile: number;
+    band: FormBand;
+    rank: number;
+    measuredDays: number;
+  };
+  turnsPositive: string | null;
+  peak: { date: string; form: number; fitness: number };
+  switchDay: { date: string; form: number; fitness: number };
+  formula: string;
+}
+
+/** The path for the saved plan or the default (no scenario), or for one typed but not saved. */
+export function planningPath(s: PlanScenario | null): string {
+  if (!s) return '/api/planning';
+  const query = new URLSearchParams({
+    event: s.eventDate,
+    switch: s.switchDate,
+    before: String(s.beforePct),
+    after: String(s.afterPct),
+  });
+  return `/api/planning?${query.toString()}`;
+}
+
+/** The server's one sentence when it sent one, otherwise the status text. */
+async function failure(response: Response): Promise<Error> {
+  let message: string | undefined;
+  try {
+    const body = (await response.json()) as { error?: string };
+    message = body.error;
+  } catch {
+    /* No JSON body: fall back to the status text. */
+  }
+  return new Error(message ?? response.statusText);
+}
+
+export async function savePlan(plan: SavedPlan): Promise<PlanningReport> {
+  const response = await fetch('/api/planning', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(plan),
+  });
+  if (!response.ok) throw await failure(response);
+  return (await response.json()) as PlanningReport;
+}
+
+export async function clearPlan(): Promise<void> {
+  const response = await fetch('/api/planning', { method: 'DELETE' });
+  if (!response.ok) throw await failure(response);
+}
