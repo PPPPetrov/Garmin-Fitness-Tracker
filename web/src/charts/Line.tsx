@@ -8,6 +8,12 @@ export interface Series {
   colour: string;
   width?: number;
   values: (number | null)[];
+  /**
+   * From this index on the series is a projection and is drawn in `paleColour`. The two
+   * parts share the point at this index, so the line stays continuous.
+   */
+  paleFrom?: number;
+  paleColour?: string;
 }
 
 export interface Annotation {
@@ -204,18 +210,30 @@ export function LineChart({
         })}
 
         <g clipPath={`url(#${clipId})`}>
-          {series.map((s) => (
-            <path
-              key={s.name}
-              d={path(s.values)}
-              fill="none"
-              stroke={s.colour}
-              strokeWidth={s.width ?? 2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
+          {series.map((s) => {
+            const line = (d: string, stroke: string, part: string) => (
+              <path
+                key={`${s.name}-${part}`}
+                d={d}
+                fill="none"
+                stroke={stroke}
+                strokeWidth={s.width ?? 2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+            const from = s.paleFrom;
+            if (from === undefined) return line(path(s.values), s.colour, 'all');
+            return [
+              line(path(s.values.map((v, i) => (i > from ? null : v))), s.colour, 'measured'),
+              line(
+                path(s.values.map((v, i) => (i < from ? null : v))),
+                s.paleColour ?? s.colour,
+                'projected',
+              ),
+            ];
+          })}
         </g>
 
         {hover != null && (
@@ -237,7 +255,11 @@ export function LineChart({
                   cy={y(v)}
                   r="4"
                   fill="var(--surface)"
-                  stroke={s.colour}
+                  stroke={
+                    s.paleFrom !== undefined && hover >= s.paleFrom
+                      ? (s.paleColour ?? s.colour)
+                      : s.colour
+                  }
                   strokeWidth="2"
                 />
               );
