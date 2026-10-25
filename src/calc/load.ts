@@ -130,19 +130,21 @@ export function computeLoadSeries(
   return series;
 }
 
-/** Recompute the stored series from the activity table. */
-export function recomputeDailyLoad(): { days: number; from: string; to: string } | null {
-  const database = db();
-
+/**
+ * What each day with a ride contributed, and the first such day.
+ *
+ * Shared by the stored series and the projection, so both start from the same inputs.
+ * Null when there are no rides at all.
+ */
+export function dailyInputs(
+  database: Database.Database = db(),
+): { from: string; perDay: Map<string, DayInput> } | null {
   const bounds = database
     .prepare(`SELECT MIN(local_date) AS lo FROM activity`)
     .get() as { lo: string | null };
   if (!bounds.lo) return null;
 
-  const from = bounds.lo;
-  const to = today();
-
-  const perDay = new Map<string, { load: number; rides: number; unmeasured: number }>();
+  const perDay = new Map<string, DayInput>();
   const rows = database
     .prepare(
       `SELECT local_date,
@@ -165,6 +167,19 @@ export function recomputeDailyLoad(): { days: number; from: string; to: string }
       unmeasured: row.unmeasured,
     });
   }
+
+  return { from: bounds.lo, perDay };
+}
+
+/** Recompute the stored series from the activity table. */
+export function recomputeDailyLoad(): { days: number; from: string; to: string } | null {
+  const database = db();
+
+  const inputs = dailyInputs(database);
+  if (!inputs) return null;
+
+  const { from, perDay } = inputs;
+  const to = today();
 
   const computedAt = new Date().toISOString();
   const insert = database.prepare(

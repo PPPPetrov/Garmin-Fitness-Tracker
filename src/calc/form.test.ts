@@ -5,6 +5,7 @@ import {
   CHANGE_WINDOW_DAYS,
   CONFIDENCE_WINDOW_DAYS,
   formPosition,
+  placeForm,
   type FormDay,
 } from './form.js';
 
@@ -153,5 +154,15 @@ describe('formPosition', () => {
 
   it('returns nothing when there are no days at all', () => {
     assert.equal(formPosition([]), null);
+  });
+});
+
+describe('placeForm', () => {
+  it('gives the percentile, band and rank of one value in an ascending history', () => {
+    assert.deepEqual(placeForm([-20, -10, 0, 10, 20], 10), {
+      percentile: 60,
+      band: 'fresh',
+      rank: 2,
+    });
   });
 });
