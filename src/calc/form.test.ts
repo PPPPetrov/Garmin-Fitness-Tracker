@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { openDatabase } from '../db/index.js';
 import { addDays } from './load.js';
 import {
   CHANGE_WINDOW_DAYS,
   CONFIDENCE_WINDOW_DAYS,
   formPosition,
+  measuredForms,
   placeForm,
   type FormDay,
 } from './form.js';
@@ -164,5 +166,28 @@ describe('placeForm', () => {
       band: 'fresh',
       rank: 2,
     });
+  });
+});
+
+describe('measuredForms', () => {
+  it('lists the forms of the measured days in ascending order and leaves the warm-up out', () => {
+    const database = openDatabase(':memory:');
+    const insert = database.prepare(
+      `INSERT INTO daily_load (local_date, load_points, ride_count, fitness, fatigue, form,
+                               is_warmup, formula_version, computed_at)
+       VALUES (?, 0, 0, 0, 0, ?, ?, 'test', '2024-01-01')`,
+    );
+    // Stored out of order, with two warm-up rows carrying the extremes.
+    const rows: [number, number, number][] = [
+      [0, -50, 1],
+      [1, 12, 0],
+      [2, -3, 0],
+      [3, 99, 1],
+      [4, 5, 0],
+    ];
+    for (const [i, form, warmup] of rows) insert.run(addDays(START, i), form, warmup);
+
+    assert.deepEqual(measuredForms(database), [-3, 5, 12]);
+    database.close();
   });
 });

@@ -7,12 +7,22 @@
  * reads "if you rode this much". Nothing is a forecast of what will happen and nothing is a
  * recommendation: no scenario is better than another, and no target form is implied.
  *
- * Nothing in this module touches the database. The projection is never stored, and the
- * stored series is never changed by it.
+ * The projection is never stored, and the stored series is never changed by it. The only
+ * thing stored is the plan the rider typed, in the `plan` table, read and written by the
+ * thin database half at the bottom of this file.
  */
 
-import { placeForm, type FormBand } from './form.js';
-import { addDays, computeLoadSeries, type DayInput } from './load.js';
+import type Database from 'better-sqlite3';
+import { db } from '../db/index.js';
+import { measuredForms, placeForm, type FormBand } from './form.js';
+import {
+  addDays,
+  computeLoadSeries,
+  dailyInputs,
+  FORMULA_VERSION,
+  today as todayLocal,
+  type DayInput,
+} from './load.js';
 
 /** The shares of the usual load a scenario can assume. */
 export const PERCENT_STEPS = [0, 25, 50, 75, 100, 125, 150] as const;
@@ -265,5 +275,108 @@ export function project(
     turnsPositive,
     peak: onTheEve(peakRow.date),
     switchDay: onTheEve(switchDate),
+  };
+}
+
+/** What the rider saved: a scenario and an optional name. */
+export interface SavedPlan extends Scenario {
+  name: string | null;
+}
+
+export interface PlanningReport extends Projection {
+  /** The saved plan, whether or not it is the one projected. */
+  plan: SavedPlan | null;
+  scenario: Scenario & { source: 'saved' | 'query' | 'default' };
+  /** The saved event date when that date has already gone by, otherwise null. */
+  past: string | null;
+  formula: string;
+}
+
+export function readPlan(database: Database.Database = db()): SavedPlan | null {
+  const row = database
+    .prepare(`SELECT name, event_date, switch_date, before_pct, after_pct FROM plan WHERE id = 1`)
+    .get() as
+    | {
+        name: string | null;
+        event_date: string;
+        switch_date: string;
+        before_pct: number;
+        after_pct: number;
+      }
+    | undefined;
+  if (!row) return null;
+  return {
+    name: row.name,
+    eventDate: row.event_date,
+    switchDate: row.switch_date,
+    beforePct: row.before_pct,
+    afterPct: row.after_pct,
+  };
+}
+
+/** Replace the one plan. */
+export function savePlan(plan: SavedPlan, database: Database.Database = db()): void {
+  database
+    .prepare(
+      `INSERT INTO plan (id, name, event_date, switch_date, before_pct, after_pct, updated_at)
+       VALUES (1, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name, event_date = excluded.event_date,
+         switch_date = excluded.switch_date, before_pct = excluded.before_pct,
+         after_pct = excluded.after_pct, updated_at = excluded.updated_at`,
+    )
+    .run(
+      plan.name,
+      plan.eventDate,
+      plan.switchDate,
+      plan.beforePct,
+      plan.afterPct,
+      new Date().toISOString(),
+    );
+}
+
+export function clearPlan(database: Database.Database = db()): void {
+  database.prepare(`DELETE FROM plan WHERE id = 1`).run();
+}
+
+/**
+ * The projection for a query scenario, else the saved plan if its event is still ahead,
+ * else the default. Null when there is no history, or no complete day to project from.
+ * The query is not validated here; the route does that.
+ */
+export function planningReport(
+  query: Scenario | null,
+  database: Database.Database = db(),
+  today: string = todayLocal(),
+): PlanningReport | null {
+  const inputs = dailyInputs(database);
+  if (!inputs || inputs.from >= today) return null;
+
+  const plan = readPlan(database);
+  let scenario: Scenario;
+  let source: 'saved' | 'query' | 'default';
+  if (query) {
+    scenario = query;
+    source = 'query';
+  } else if (plan && plan.eventDate > today) {
+    scenario = {
+      eventDate: plan.eventDate,
+      switchDate: plan.switchDate,
+      beforePct: plan.beforePct,
+      afterPct: plan.afterPct,
+    };
+    source = 'saved';
+  } else {
+    scenario = defaultScenario(today);
+    source = 'default';
+  }
+
+  const projection = project(inputs.perDay, inputs.from, today, scenario, measuredForms(database));
+  return {
+    ...projection,
+    plan,
+    scenario: { ...scenario, source },
+    past: plan && plan.eventDate < today ? plan.eventDate : null,
+    formula: FORMULA_VERSION,
   };
 }

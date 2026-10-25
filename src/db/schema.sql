@@ -129,3 +129,14 @@ CREATE TABLE IF NOT EXISTS sync_run (
   status           TEXT NOT NULL CHECK (status IN ('running','ok','failed')),
   error            TEXT
 );
+
+-- The one plan the rider typed. Sync and recompute never read or write it.
+CREATE TABLE IF NOT EXISTS plan (
+  id          INTEGER PRIMARY KEY CHECK (id = 1),
+  name        TEXT,
+  event_date  TEXT NOT NULL,
+  switch_date TEXT NOT NULL,
+  before_pct  INTEGER NOT NULL,
+  after_pct   INTEGER NOT NULL,
+  updated_at  TEXT NOT NULL
+);

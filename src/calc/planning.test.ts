@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { placeForm } from './form.js';
-import { addDays, computeLoadSeries, type DayInput } from './load.js';
+import { openDatabase } from '../db/index.js';
+import { addDays, computeLoadSeries, dailyInputs, type DayInput } from './load.js';
 import {
+  clearPlan,
   defaultScenario,
+  planningReport,
   project,
+  readPlan,
+  savePlan,
   scenarioError,
   scenarioLoad,
   usualLoad,
@@ -306,5 +311,132 @@ describe('defaultScenario', () => {
       beforePct: 0,
       afterPct: 0,
     });
+  });
+});
+
+describe('plan storage and planningReport', () => {
+  /** An in-memory database with one ride a day from `from` to yesterday, and daily_load filled. */
+  function seeded(from: string | null = addDays(TODAY, -100)) {
+    const database = openDatabase(':memory:');
+    if (from) {
+      const insert = database.prepare(
+        `INSERT INTO activity (activity_id, activity_type, start_time_local, local_date,
+                               duration_s, avg_hr, activity_training_load, imported_at)
+         VALUES (?, 'road_biking', '2024-01-01 09:00:00', ?, 3600, 140, 40, '2024-01-01')`,
+      );
+      let id = 1;
+      for (let d = from; d < TODAY; d = addDays(d, 1)) insert.run(id++, d);
+
+      const inputs = dailyInputs(database)!;
+      const insertRow = database.prepare(
+        `INSERT INTO daily_load (local_date, load_points, ride_count, fitness, fatigue, form,
+                                 is_warmup, unmeasured_rides, is_estimated, formula_version, computed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'test', '2024-01-01')`,
+      );
+      for (const r of computeLoadSeries(inputs.perDay, inputs.from, addDays(TODAY, -1))) {
+        insertRow.run(
+          r.date, r.load, r.rides, r.fitness, r.fatigue, r.form,
+          r.isWarmup ? 1 : 0, r.unmeasured, r.isEstimated ? 1 : 0,
+        );
+      }
+    }
+    return database;
+  }
+
+  const saved = (overrides: Partial<Scenario> = {}) => ({
+    name: 'Spring race' as string | null,
+    ...scenario(overrides),
+  });
+
+  it('is null with no rides', () => {
+    const database = seeded(null);
+    assert.equal(planningReport(null, database, TODAY), null);
+    database.close();
+  });
+
+  it('is null when the history starts today, with no complete day to project from', () => {
+    const database = openDatabase(':memory:');
+    database
+      .prepare(
+        `INSERT INTO activity (activity_id, activity_type, start_time_local, local_date,
+                               duration_s, avg_hr, activity_training_load, imported_at)
+         VALUES (1, 'road_biking', '2026-10-25 09:00:00', ?, 3600, 140, 40, '2026-10-25')`,
+      )
+      .run(TODAY);
+    assert.equal(planningReport(null, database, TODAY), null);
+    database.close();
+  });
+
+  it('projects the default with no plan: rest from today to four weeks ahead', () => {
+    const database = seeded();
+    const report = planningReport(null, database, TODAY)!;
+    assert.equal(report.scenario.source, 'default');
+    assert.equal(report.scenario.eventDate, addDays(TODAY, 28));
+    assert.equal(report.scenario.afterPct, 0);
+    assert.equal(report.plan, null);
+    assert.equal(report.past, null);
+    database.close();
+  });
+
+  it('round-trips a saved plan, name null included, and keeps one row', () => {
+    const database = seeded();
+    const first = saved({ switchDate: addDays(TODAY, 5), beforePct: 50, afterPct: 125 });
+    savePlan(first, database);
+    assert.deepEqual(readPlan(database), first);
+
+    const second = { ...saved({ afterPct: 25 }), name: null };
+    savePlan(second, database);
+    assert.deepEqual(readPlan(database), second);
+    const count = database.prepare(`SELECT COUNT(*) AS n FROM plan`).get() as { n: number };
+    assert.equal(count.n, 1);
+    database.close();
+  });
+
+  it('projects a saved future plan', () => {
+    const database = seeded();
+    savePlan(saved(), database);
+    const report = planningReport(null, database, TODAY)!;
+    assert.equal(report.scenario.source, 'saved');
+    assert.equal(report.scenario.eventDate, addDays(TODAY, 30));
+    assert.equal(report.plan?.name, 'Spring race');
+    database.close();
+  });
+
+  it('falls back to the default for a plan in the past, and names it', () => {
+    const database = seeded();
+    const yesterday = addDays(TODAY, -1);
+    savePlan(saved({ eventDate: yesterday, switchDate: addDays(TODAY, -10) }), database);
+    const report = planningReport(null, database, TODAY)!;
+    assert.equal(report.past, yesterday);
+    assert.equal(report.scenario.source, 'default');
+    database.close();
+  });
+
+  it('treats a plan whose event is today as neither past nor current', () => {
+    const database = seeded();
+    savePlan(saved({ eventDate: TODAY, switchDate: addDays(TODAY, -10) }), database);
+    const report = planningReport(null, database, TODAY)!;
+    assert.equal(report.past, null);
+    assert.equal(report.scenario.source, 'default');
+    database.close();
+  });
+
+  it('lets a query override the saved plan without touching it', () => {
+    const database = seeded();
+    const plan = saved();
+    savePlan(plan, database);
+    const report = planningReport(scenario({ afterPct: 50 }), database, TODAY)!;
+    assert.equal(report.scenario.source, 'query');
+    assert.equal(report.scenario.afterPct, 50);
+    assert.deepEqual(report.plan, plan);
+    database.close();
+  });
+
+  it('forgets the plan once cleared', () => {
+    const database = seeded();
+    savePlan(saved(), database);
+    clearPlan(database);
+    assert.equal(readPlan(database), null);
+    database.close();
   });
 });
