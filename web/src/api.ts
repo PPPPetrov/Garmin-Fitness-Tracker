@@ -170,3 +170,46 @@ export function useApi<T>(path: string, deps: unknown[] = []): Async<T> {
 export function startSync(): Promise<Response> {
   return fetch('/api/sync', { method: 'POST' });
 }
+
+/** The Performance screen's figures. Mirrors `PerformanceReport` in src/calc/performance.ts. */
+export interface EfficiencyMonth {
+  month: string;
+  median: number | null;
+  rides: number;
+}
+
+export interface CriticalPowerMonth {
+  month: string;
+  cp: number | null;
+  wPrimeJ: number | null;
+  rides: number;
+  garminFtp: number | null;
+}
+
+export interface PerformanceReport {
+  efficiency: {
+    months: EfficiencyMonth[];
+    thisMonth: EfficiencyMonth;
+    recent: number | null;
+    before: number | null;
+    change: number | null;
+    recentSpan: [string, string];
+    beforeSpan: [string, string];
+    rides: number;
+  };
+  criticalPower: {
+    months: CriticalPowerMonth[];
+    window: { from: string; to: string; bests: { durationS: number; watts: number; date: string }[] };
+  };
+  ramp: {
+    date: string;
+    perWeek: number;
+    percentile: number;
+    percentAbove: number;
+    band: 'lowest' | 'low' | 'middle' | 'high' | 'highest';
+    lastInBand: string | null;
+    estimated: boolean;
+  } | null;
+  heldBack: number;
+  formula: { efficiency: string; criticalPower: string; ramp: string };
+}

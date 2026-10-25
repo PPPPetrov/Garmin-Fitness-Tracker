@@ -4,11 +4,13 @@ import { monthYear, num, stamp } from './format';
 import { DatabaseIcon, MenuIcon, SearchIcon, SyncIcon } from './ui';
 import { Activities } from './views/Activities';
 import { Overview } from './views/Overview';
+import { Performance } from './views/Performance';
 import { Trends } from './views/Trends';
 
 const VIEWS = [
   { id: 'overview', label: 'Overview' },
   { id: 'trends', label: 'Trends' },
+  { id: 'performance', label: 'Performance' },
   { id: 'activities', label: 'Activities' },
 ] as const;
 
@@ -206,6 +208,7 @@ export function App() {
         <main className="page">
           {view === 'overview' && <Overview />}
           {view === 'trends' && <Trends />}
+          {view === 'performance' && <Performance />}
           {view === 'activities' && <Activities search={search} onSearch={setSearch} />}
         </main>
       </div>

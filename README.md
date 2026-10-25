@@ -34,6 +34,12 @@ fitness over the same four weeks beside the change in form, because form rises w
 falls exactly as it rises when fatigue does, and only the pair tells a taper from a fortnight
 off. It does not tell you what to ride.
 
+**Measures performance**, not just load. Fitness in the load model rises with any month of hard
+riding, so a separate screen shows three figures that move only when the rider gets stronger:
+efficiency (normalized power per heartbeat, on road rides), critical power fitted from the
+90-day best efforts and drawn beside Garmin's own FTP, and the weekly ramp in fitness placed
+against the rider's own weeks. The maths is in [`docs/performance.md`](docs/performance.md).
+
 **Breaks the riding down by heart-rate zone**, which is the only intensity measure here that
 reaches the mountain biking, where there is no power meter. Garmin reports five buckets per ride
 in the activity list; they sit on 264 of 423 rides and on none before 2024. The figures are
@@ -46,12 +52,13 @@ Garmin returns a figure about eight times too low instead of returning nothing. 
 counted rather than quietly averaged in, every day within 42 days of one is marked, and the
 dashboard draws those days as open columns rather than solid ones.
 
-**Serves three screens** on `localhost`:
+**Serves four screens** on `localhost`:
 
 | Screen | The question it answers |
 | --- | --- |
 | Overview | Am I fitter than I was, and how much fatigue am I carrying into today? |
 | Trends | How has the load moved over this period, and what are my best powers? |
+| Performance | Is my body getting stronger, not just busier? |
 | Activities | Find the ride I am thinking of. |
 
 ## Requirements
@@ -136,6 +143,7 @@ form sits, the heart-rate zone totals, and FIT handling. What each one pins down
 | Document | What is in it |
 | --- | --- |
 | [`docs/architecture.md`](docs/architecture.md) | How the pieces fit: the import pipeline, the Garmin client, FIT handling, configuration, the layout of the source |
+| [`docs/performance.md`](docs/performance.md) | Efficiency, critical power and ramp rate: the rules, the data limits, and what the tests pin down |
 | [`docs/load-model.md`](docs/load-model.md) | The fitness and fatigue maths, the warm-up window, how unreliable rides are handled, and what the tests pin down |
 | [`docs/data-model.md`](docs/data-model.md) | Every table and column, and why each one exists |
 | [`docs/api.md`](docs/api.md) | The local HTTP API: every endpoint, its parameters and its response shape |
