@@ -11,9 +11,18 @@ import { LineChart, LineLegend, type Annotation } from '../charts/Line';
 import { addDays, DASH, dayDate, num, shortDate, signed } from '../format';
 import { Card } from '../ui';
 import { formCaption, planningFinding, pointsText } from './planningCopy';
-
-/** The shares of the usual load a phase can take, as the server accepts them. */
-const STEPS = [0, 25, 50, 75, 100, 125, 150];
+import {
+  lastDays,
+  levelsWith,
+  moveEvent,
+  PRESETS,
+  presetOf,
+  presetPhases,
+  switchFor,
+  TAPER_DAYS,
+  TAPER_PCT,
+  type Preset,
+} from './planningScenario';
 
 /** How far ahead an event may be, as the server checks it. */
 const HORIZON_DAYS = 180;
@@ -21,97 +30,87 @@ const HORIZON_DAYS = 180;
 /** How long a name may be, as the server checks it. */
 const NAME_MAX = 60;
 
-/** How long the controls wait for the rider to stop changing them before re-projecting. */
-const DEBOUNCE_MS = 250;
+/** How long the controls wait for the rider to stop changing them before saving. */
+const DEBOUNCE_MS = 400;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const INFO = {
   form: "What you carry into the day, before that day's riding: the same definition as on Overview.",
   projection:
     'The same arithmetic as the history, fed an assumed load instead of a measured one. It says what would happen if you rode exactly like this, not what to ride.',
   scenario:
-    'The load is spread evenly across the days. Real riding is not, and a hard ride a day or two before the event leaves form lower than shown. The usual is your own last four weeks, not a target.',
+    'Rest, Usual and Taper are names for common shapes, not advice. The load is spread evenly across the days. Real riding is not, and a hard ride a day or two before the event leaves form lower than shown. The usual is your own last four weeks, not a target. Every change is saved.',
 };
 
 /** The screen's question: where will I be on the day that matters? */
 export function Planning() {
-  /* What `useApi` reads. It changes only when a control is changed (after the debounce) or
-     when the plan is cleared, so the first load asks for the saved plan or the default.
-     `n` counts the requests issued, so the same path can be asked again and a response
-     can be told apart from one issued later. */
-  const [request, setRequest] = useState({ path: planningPath(null), n: 0 });
-  const latest = useApi<PlanningReport | null>(request.path, [request.path, request.n]);
-  /* Requests up to this number were issued before the last save landed: their reports
-     carry the plan as it was, so they must not replace the one the save returned. */
-  const staleUpTo = useRef(-1);
-  const issued = useRef(0);
-  const stale = request.n <= staleUpTo.current;
+  /* The saved plan or the default, read on the first load and again after a clear. Every
+     change after that is saved, and the save returns the report, so nothing else is read. */
+  const [loads, setLoads] = useState(0);
+  const latest = useApi<PlanningReport | null>(planningPath(null), [loads]);
 
-  /* The report on the page: the last one that arrived, or the one a save returned. It stays
-     while the next one loads or when the next one is refused, so the skeletons show only on
+  /* The report on the page: the last one loaded, or the one the last save returned. It stays
+     while the next save is on its way or when it is refused, so the skeletons show only on
      the first load. Undefined until the first report; null when there is no history. */
   const [shown, setShown] = useState<PlanningReport | null | undefined>(undefined);
   const [draft, setDraft] = useState<SavedPlan | null>(null);
-  const draftNow = useRef<SavedPlan | null>(null);
-  draftNow.current = draft;
+  /* The preset the rider chose. Kept apart from the draft, because a custom scenario can
+     match a preset and must still show its controls. */
+  const [preset, setPreset] = useState<Preset>('rest');
   /* Set when the next report should replace the controls: the first load, and a clear. */
   const reseed = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  /* A change waiting out the debounce, so the page does not yet show what the controls say. */
+  /* Counts the saves sent, so a reply that has been overtaken by a later one is dropped. */
+  const sent = useRef(0);
+  /* A change waiting out the debounce, or a save on its way. */
   const [pending, setPending] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(0);
   const [clearing, setClearing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (latest.state !== 'ready' || stale) return;
+    if (latest.state !== 'ready' || !reseed.current) return;
+    reseed.current = false;
     setShown(latest.data);
-    if (reseed.current) {
-      reseed.current = false;
-      setDraft(latest.data ? draftFrom(latest.data) : null);
-      setClearing(false);
-    }
+    const day = latest.data ? addDays(latest.data.start.date, 1) : '';
+    const next = latest.data ? draftFrom(latest.data, day) : null;
+    setDraft(next);
+    if (next) setPreset(presetOf(next, day));
+    setClearing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest]);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  function ask(path: string) {
-    issued.current += 1;
-    setRequest({ path, n: issued.current });
-  }
-
-  /** Change the controls, and re-project once they have been still for a moment. */
-  function edit(change: Partial<SavedPlan>) {
-    if (!draft) return;
-    const next = { ...draft, ...change };
+  /** Change the controls, and save once they have been still for a moment. */
+  function edit(next: SavedPlan) {
     setDraft(next);
     setSaveError(null);
     clearTimeout(timer.current);
+    /* A date field part-way through being typed is not a date yet: wait for one. */
+    if (!ISO_DATE.test(next.eventDate)) {
+      setPending(false);
+      return;
+    }
     setPending(true);
     timer.current = setTimeout(() => {
       setPending(false);
-      ask(planningPath(next));
+      void save(next);
     }, DEBOUNCE_MS);
   }
 
-  async function save() {
-    if (!draft) return;
-    const sent = draft;
-    clearTimeout(timer.current);
-    setPending(false);
-    setSaving(true);
-    setSaveError(null);
+  async function save(plan: SavedPlan) {
+    sent.current += 1;
+    const n = sent.current;
+    setSaving((count) => count + 1);
     try {
-      const saved = await savePlan({ ...sent, name: cleanName(sent.name) });
-      staleUpTo.current = issued.current;
-      setShown(saved);
-      /* A control changed while the save was on its way: project what the controls say now. */
-      const now = draftNow.current;
-      if (now && now !== sent) ask(planningPath(now));
+      const saved = await savePlan({ ...plan, name: cleanName(plan.name) });
+      if (n === sent.current) setShown(saved);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : String(error));
+      if (n === sent.current) setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
-      setSaving(false);
+      setSaving((count) => count - 1);
     }
   }
 
@@ -123,7 +122,7 @@ export function Planning() {
     try {
       await clearPlan();
       reseed.current = true;
-      ask(planningPath(null));
+      setLoads((n) => n + 1);
     } catch (error) {
       setClearing(false);
       setSaveError(error instanceof Error ? error.message : String(error));
@@ -142,8 +141,18 @@ export function Planning() {
   const eventRow = series[series.length - 1];
   const lessSure = eventRow?.estimated ? ' · less sure' : '';
   const name = cleanName(draft.name);
-  const unsaved = isUnsaved(draft, report.plan, today);
-  const queryError = latest.state === 'error' && !stale ? latest.message : null;
+  const busy = pending || saving > 0;
+  const datesOk = ISO_DATE.test(draft.eventDate);
+  /* At most a day short of today, so the first share always holds a day. */
+  const maxLast = datesOk ? Math.max(0, daysBetween(today, draft.eventDate) - 1) : 0;
+  const last = datesOk ? lastDays(draft) : 0;
+
+  function choose(next: Preset) {
+    setPreset(next);
+    if (next !== 'custom' && draft && datesOk) {
+      edit({ ...draft, ...presetPhases(next, draft.eventDate, today) });
+    }
+  }
 
   return (
     <>
@@ -205,66 +214,106 @@ export function Planning() {
                   maxLength={NAME_MAX}
                   placeholder="What the day is"
                   value={draft.name ?? ''}
-                  onChange={(e) => edit({ name: e.target.value })}
+                  onChange={(e) => edit({ ...draft, name: e.target.value })}
                 />
               </label>
 
-              <div className="control-pair">
-                <label className="control">
-                  <span className="control-label">Event date</span>
-                  <input
-                    className="field"
-                    type="date"
-                    min={addDays(today, 1)}
-                    max={addDays(today, HORIZON_DAYS)}
-                    value={draft.eventDate}
-                    onChange={(e) => edit({ eventDate: e.target.value })}
-                  />
-                </label>
-                <label className="control">
-                  <span className="control-label">Switch date</span>
-                  <input
-                    className="field"
-                    type="date"
-                    min={today}
-                    max={draft.eventDate}
-                    value={draft.switchDate}
-                    onChange={(e) => edit({ switchDate: e.target.value })}
-                  />
-                </label>
+              <label className="control">
+                <span className="control-label">Event date</span>
+                <input
+                  className="field"
+                  type="date"
+                  min={addDays(today, 1)}
+                  max={addDays(today, HORIZON_DAYS)}
+                  value={draft.eventDate}
+                  onChange={(e) => {
+                    const eventDate = e.target.value;
+                    if (!ISO_DATE.test(eventDate)) return edit({ ...draft, eventDate });
+                    /* Move from the last whole date, so a half-typed one does not count. */
+                    const from = datesOk ? draft : { ...draft, eventDate: report.scenario.eventDate };
+                    edit({ ...draft, ...moveEvent(from, preset, eventDate, today) });
+                  }}
+                />
+              </label>
+
+              <div className="control" role="group" aria-label="Plan">
+                <span className="control-label">Plan</span>
+                <div className="seg seg-fill">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-pressed={p.id === preset}
+                      onClick={() => choose(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {preset !== 'custom' && (
+                  <span className="caption">{presetCaption(preset, usual.perWeek)}</span>
+                )}
               </div>
 
-              <Phase
-                label="Before the switch"
-                value={draft.beforePct}
-                perWeek={usual.perWeek}
-                onChange={(beforePct) => edit({ beforePct })}
-              />
-              <Phase
-                label="After the switch"
-                value={draft.afterPct}
-                perWeek={usual.perWeek}
-                onChange={(afterPct) => edit({ afterPct })}
-              />
+              {preset === 'custom' && (
+                <>
+                  <Phase
+                    label="Ride"
+                    value={draft.beforePct}
+                    perWeek={usual.perWeek}
+                    onChange={(beforePct) => edit({ ...draft, beforePct })}
+                  />
+                  <label className="control">
+                    <span className="control-label">Last days</span>
+                    <input
+                      className="field"
+                      type="number"
+                      min={0}
+                      max={maxLast}
+                      step={1}
+                      disabled={!datesOk}
+                      value={last}
+                      onChange={(e) => {
+                        const days = Number(e.target.value);
+                        if (e.target.value === '' || !Number.isFinite(days)) return;
+                        const clamped = Math.min(maxLast, Math.max(0, Math.round(days)));
+                        edit({ ...draft, switchDate: switchFor(draft.eventDate, clamped, today) });
+                      }}
+                    />
+                    <span className="caption">
+                      {last === 0
+                        ? 'No change: the same share to the day'
+                        : `${num(last)} ${last === 1 ? 'day' : 'days'} from ${shortDate(draft.switchDate)}, at the share below`}
+                    </span>
+                  </label>
+                  {last > 0 && (
+                    <Phase
+                      label="Then ride"
+                      value={draft.afterPct}
+                      perWeek={usual.perWeek}
+                      onChange={(afterPct) => edit({ ...draft, afterPct })}
+                    />
+                  )}
+                </>
+              )}
 
-              {(queryError ?? saveError) && (
+              {saveError && (
                 <p className="state state-error" role="alert">
-                  {queryError ?? saveError}
+                  {saveError}
                 </p>
               )}
 
               <div className="control-actions">
-                <button
-                  className="btn-quiet"
-                  type="button"
-                  onClick={save}
-                  disabled={saving || pending || latest.state !== 'ready' || queryError != null}
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                {unsaved && <span className="caption">Not saved</span>}
+                <span className="caption">
+                  {busy ? 'Saving…' : report.plan ? 'Saved' : 'Changes are saved as you make them'}
+                </span>
                 {report.plan && (
-                  <button className="text-button" type="button" onClick={clear} disabled={clearing}>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={clear}
+                    disabled={clearing || busy}
+                  >
                     Clear plan
                   </button>
                 )}
@@ -292,7 +341,7 @@ export function Planning() {
                 sub={`${shortDate(peak.date)} · fitness ${num(peak.fitness, 1)}`}
                 figure={signed(peak.form, 1)}
               />
-              {scenario.switchDate !== today && (
+              {scenario.switchDate !== today && scenario.switchDate !== scenario.eventDate && (
                 <Row
                   name="At the switch"
                   sub={`${shortDate(switchDay.date)} · fitness ${num(switchDay.fitness, 1)}`}
@@ -342,10 +391,16 @@ export function Planning() {
  * is what was projected. The dates come from the projection, so a saved switch that has gone
  * by reads as today, as the server projected it.
  */
-function draftFrom(report: PlanningReport): SavedPlan {
+function draftFrom(report: PlanningReport, today: string): SavedPlan {
   const { eventDate, switchDate, beforePct, afterPct, source } = report.scenario;
   const name = source === 'saved' ? (report.plan?.name ?? null) : null;
-  return { name, eventDate, switchDate, beforePct, afterPct };
+  const draft = { name, eventDate, switchDate, beforePct, afterPct };
+  /* A custom scenario that switches today has an empty first phase, which the custom
+     controls would still show. Say it as its one share to the day instead: the same days. */
+  if (switchDate === today && presetOf(draft, today) === 'custom') {
+    return { ...draft, beforePct: afterPct, switchDate: eventDate };
+  }
+  return draft;
 }
 
 /** A blank name is no name. */
@@ -354,21 +409,11 @@ function cleanName(name: string | null): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/**
- * Whether the controls differ from the saved plan in any field. With no plan, always. A
- * saved switch that has gone by counts as today, as the server projects it, so an untouched
- * plan in its after phase reads as saved.
- */
-function isUnsaved(draft: SavedPlan, plan: SavedPlan | null, today: string): boolean {
-  if (!plan) return true;
-  const planSwitch = plan.switchDate < today ? today : plan.switchDate;
-  return (
-    cleanName(draft.name) !== cleanName(plan.name) ||
-    draft.eventDate !== plan.eventDate ||
-    draft.switchDate !== planSwitch ||
-    draft.beforePct !== plan.beforePct ||
-    draft.afterPct !== plan.afterPct
-  );
+/** What a preset rides, in points. */
+function presetCaption(preset: Exclude<Preset, 'custom'>, perWeek: number): string {
+  if (preset === 'rest') return 'No riding from today';
+  if (preset === 'usual') return `${pointsText(100, perWeek)}, to the day`;
+  return `${pointsText(100, perWeek)}, then ${pointsText(TAPER_PCT, perWeek)} for the last ${TAPER_DAYS} days`;
 }
 
 /** Whole days from one ISO date to another, in UTC so no daylight-saving hour counts. */
@@ -439,7 +484,7 @@ function ProjectionChart({
   );
 }
 
-/** One share of the usual load, as seven segments, with what the choice is in points. */
+/** One share of the usual load, as a few segments, with what the choice is in points. */
 function Phase({
   label,
   value,
@@ -455,7 +500,7 @@ function Phase({
     <div className="control" role="group" aria-label={label}>
       <span className="control-label">{label}</span>
       <div className="seg seg-fill">
-        {STEPS.map((pct) => (
+        {levelsWith(value).map((pct) => (
           <button
             key={pct}
             type="button"
@@ -603,7 +648,7 @@ function Loading() {
             <div className="skeleton skeleton-plot" style={{ height: 300 }} />
           </Card>
           <Card title="Scenario">
-            {Array.from({ length: 7 }, (_, i) => (
+            {Array.from({ length: 4 }, (_, i) => (
               <div className="skeleton skeleton-row" key={i} style={{ width: '100%' }} />
             ))}
           </Card>

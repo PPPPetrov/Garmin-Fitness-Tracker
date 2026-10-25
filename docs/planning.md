@@ -22,7 +22,8 @@ divides by the days there are. On 25 October 2026 that is 65.5 points a day, 458
 14 rides, 5 of them unmeasured, from 27 September to 24 October.
 
 **The share** is one of 0, 25, 50, 75, 100, 125 or 150 percent. 0 is rest and 100 is the
-usual. The screen shows each step beside its weekly points, so "50%" reads as "229 a week".
+usual. The screen offers 0, 50, 100 and 125, and a saved share outside them as well, and shows
+the chosen one beside its weekly points, so "50%" reads as "229 a week".
 
 ## The scenario
 
@@ -45,6 +46,29 @@ A saved plan whose switch date has gone by, but whose event is still ahead, is p
 its switch at today. That is the same projection, because every day left already takes the
 after share, and it keeps the controls on a scenario that can be saved again. The stored row
 keeps the date as typed, and an untouched plan still reads as saved.
+
+## The controls
+
+The screen asks for an event date and a **plan**, one of four:
+
+| Plan | What it sets |
+| --- | --- |
+| Rest | 0% from today. |
+| Usual | 100% from today. |
+| Taper | 100%, then 50% for the last 7 days. With less than 7 days to go, 50% from today. |
+| Custom | A share, a number of last days, and a share for those days. |
+
+Rest, Usual and Taper are names for shapes the scenario can already take, not advice. The
+custom controls set the same four fields: the switch date is the event date less the last
+days, and is kept at least a day after today so the first share holds a day. A scenario is
+shown as the plan its days actually take, so a saved switch on today with 0% after it opens as
+Rest. A custom one that switches today opens as its after share to the day, with no last days.
+Moving the event date keeps the plan: a preset is set again against the new date, and a custom
+scenario keeps its number of last days.
+
+Every change is saved, a moment after the last one, and the save returns the projection. There
+is no Save button. The code is
+[`web/src/views/planningScenario.ts`](../web/src/views/planningScenario.ts).
 
 Only one plan can be saved, with an optional name of up to 60 characters. It is kept in the
 `plan` table and nothing else is stored: the projection is recomputed on every request and
@@ -158,6 +182,14 @@ of unmeasured rides is shown under "What this rests on".
 - a saved plan whose switch has gone by is projected and reported with its switch at today,
   the same as that plan saved with its switch at today, and its stored row is unchanged;
 - a query overrides the saved plan without touching it, and a cleared plan is forgotten.
+
+[`web/src/views/planningScenario.test.ts`](../web/src/views/planningScenario.test.ts):
+
+- the last days put the switch before the event and read back, and never before today;
+- each preset sets its phases and is read back from them, judged by the phases that hold a day;
+- a taper with less than 7 days to go is still a taper, and anything else is custom;
+- moving the event keeps a preset's shape and a custom scenario's last days;
+- a share outside the offered ones is offered too.
 
 [`src/routes/planning.test.ts`](../src/routes/planning.test.ts):
 
