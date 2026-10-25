@@ -13,7 +13,7 @@ import {
   watts,
 } from '../format';
 import { Card, Delta } from '../ui';
-import { noEstimateReason } from './performanceCopy';
+import { efficiencyEmptyText, noEstimateReason, noFindingText } from './performanceCopy';
 
 /** The screen's question: is my body getting stronger, not just busier? */
 export function Performance() {
@@ -172,7 +172,7 @@ export function Performance() {
             info="The median of each month's road rides, in watts per beat. Indoor rides are left out because heart rate runs differently on a trainer, and heat raises heart rate, so a hot month reads lower."
           >
             {effMonths.length === 0 ? (
-              <p className="state">No road ride with power and heart rate yet.</p>
+              <p className="state">{efficiencyEmptyText(efficiency.thisMonth)}</p>
             ) : (
               <>
                 <LineChart
@@ -321,7 +321,7 @@ export function performanceFinding({ efficiency, criticalPower, ramp }: Performa
       </>
     );
   }
-  return 'No powered rides yet, so there is nothing to measure here.';
+  return noFindingText(criticalPower.months.length > 0 || efficiency.rides > 0);
 }
 
 function criticalPowerCaption(
@@ -482,6 +482,16 @@ function Loading() {
           </Card>
           <Card title="Best power by season">
             <div className="skeleton skeleton-plot" style={{ height: 300 }} />
+          </Card>
+        </div>
+        <div className="grid grid-2-1">
+          <Card title="Efficiency by month">
+            <div className="skeleton skeleton-plot" style={{ height: 220 }} />
+          </Card>
+          <Card title="What these rest on">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div className="skeleton skeleton-row" key={i} style={{ width: '100%' }} />
+            ))}
           </Card>
         </div>
       </div>

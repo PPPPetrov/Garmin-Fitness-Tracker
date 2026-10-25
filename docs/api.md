@@ -298,8 +298,9 @@ each request; nothing is stored. The maths is in [`performance.md`](performance.
   A duration with no effort in the window is absent rather than zero.
 - `ramp` is `null` until the history is longer than the warm-up plus a week. `date` is the
   latest day the load model holds, which is the last sync.
-- Rides held back by the Garmin cross-check are excluded from every figure and counted in
-  `heldBack`.
+- Rides held back by the Garmin cross-check are left out of critical power, which reads the
+  FIT-derived curves, and counted in `heldBack`. Efficiency uses Garmin's own normalized power
+  and ramp rate uses the load model, so neither depends on the FIT file.
 
 ---
 
