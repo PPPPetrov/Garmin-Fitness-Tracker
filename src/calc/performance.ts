@@ -12,6 +12,8 @@
  * trainer with a mountain road.
  */
 
+import { addDays } from './load.js';
+
 export const EFFICIENCY_TYPE = 'road_biking';
 export const EFFICIENCY_MIN_MOVING_S = 1800;
 export const EFFICIENCY_MIN_MONTH_RIDES = 3;
@@ -129,5 +131,138 @@ export function efficiencyReading(rides: readonly EfficiencyRide[], today: strin
     recentSpan,
     beforeSpan,
     rides: qualifying.length,
+  };
+}
+
+export const CP_DURATIONS_S = [120, 300, 600, 1200] as const;
+export const CP_WINDOW_DAYS = 90;
+export const CP_MIN_DURATIONS = 3;
+
+/** One duration of one ride's power curve. The caller passes only rides whose file is parsed. */
+export interface CurveEffort {
+  activityId: number;
+  date: string;
+  durationS: number;
+  watts: number;
+}
+
+/** Garmin's FTP as it stood on a ride, oldest first. */
+export interface FtpRide {
+  date: string;
+  watts: number;
+}
+
+export interface CriticalPowerMonth {
+  month: string;
+  cp: number | null;
+  wPrimeJ: number | null;
+  /** Distinct rides behind the month's window. */
+  rides: number;
+  garminFtp: number | null;
+}
+
+export interface Best {
+  durationS: number;
+  watts: number;
+  date: string;
+}
+
+export interface CriticalPowerReading {
+  months: CriticalPowerMonth[];
+  /** The window behind the latest month, and the bests that feed it. */
+  window: { from: string; to: string; bests: Best[] };
+}
+
+/**
+ * The two-parameter critical power model, `work = CP × t + W′`, fitted by least squares to
+ * the work done at each duration. CP is the power that could in principle be held
+ * indefinitely; W′ is the fixed store of work above it.
+ *
+ * A fit with no positive W′ says the bests do not fall the way a maximal curve does — the
+ * efforts were not all-out — and is refused rather than shown.
+ */
+export function fitCriticalPower(
+  bests: readonly { durationS: number; watts: number }[],
+): { cp: number; wPrimeJ: number } | null {
+  if (bests.length < CP_MIN_DURATIONS) return null;
+  const xs = bests.map((b) => b.durationS);
+  const ys = bests.map((b) => b.watts * b.durationS);
+  const meanX = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let sxy = 0;
+  let sxx = 0;
+  for (let i = 0; i < xs.length; i++) {
+    sxy += (xs[i]! - meanX) * (ys[i]! - meanY);
+    sxx += (xs[i]! - meanX) ** 2;
+  }
+  const cp = sxy / sxx;
+  const wPrime = meanY - cp * meanX;
+  if (!(cp > 0) || !(wPrime > 0)) return null;
+  return { cp: Math.round(cp * 10) / 10, wPrimeJ: Math.round(wPrime) };
+}
+
+function lastDayOf(month: string): string {
+  return addDays(`${addMonths(month, 1)}-01`, -1);
+}
+
+/** The best at each critical-power duration in the 90 days ending on `end`, earlier ride on a tie. */
+function windowBests(efforts: readonly CurveEffort[], end: string): { bests: Best[]; rides: number } {
+  const start = addDays(end, -CP_WINDOW_DAYS);
+  const inWindow = efforts.filter(
+    (e) => e.date > start && e.date <= end && (CP_DURATIONS_S as readonly number[]).includes(e.durationS),
+  );
+  const best = new Map<number, Best>();
+  for (const e of inWindow) {
+    const held = best.get(e.durationS);
+    if (!held || e.watts > held.watts || (e.watts === held.watts && e.date < held.date)) {
+      best.set(e.durationS, { durationS: e.durationS, watts: e.watts, date: e.date });
+    }
+  }
+  return {
+    bests: [...best.values()].sort((a, b) => a.durationS - b.durationS),
+    rides: new Set(inWindow.map((e) => e.activityId)).size,
+  };
+}
+
+/**
+ * Critical power at the end of every month, from the bests of the 90 days before it,
+ * beside Garmin's own FTP on the same day. It only knows the efforts actually ridden:
+ * without a hard five- and twenty-minute effort in the window it reads low.
+ */
+export function criticalPowerReading(
+  efforts: readonly CurveEffort[],
+  ftp: readonly FtpRide[],
+  today: string,
+): CriticalPowerReading {
+  const current = monthOf(today);
+  const ftpOn = (end: string) => {
+    let inForce: number | null = null;
+    for (const f of ftp) {
+      if (f.date > end) break;
+      inForce = f.watts;
+    }
+    return inForce;
+  };
+
+  const first = efforts.map((e) => monthOf(e.date)).sort()[0];
+  const months: CriticalPowerMonth[] = [];
+  if (first != null) {
+    for (let m = first; m <= current; m = addMonths(m, 1)) {
+      const end = m === current ? today : lastDayOf(m);
+      const { bests, rides } = windowBests(efforts, end);
+      const fit = fitCriticalPower(bests);
+      months.push({
+        month: m,
+        cp: fit?.cp ?? null,
+        wPrimeJ: fit?.wPrimeJ ?? null,
+        rides,
+        garminFtp: ftpOn(end),
+      });
+    }
+  }
+
+  return {
+    months,
+    window: { from: addDays(today, -(CP_WINDOW_DAYS - 1)), to: today, bests: windowBests(efforts, today).bests },
   };
 }

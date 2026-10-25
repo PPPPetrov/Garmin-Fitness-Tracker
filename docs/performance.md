@@ -59,3 +59,49 @@ The rise from April–June to July–September 2026 happened through the summer,
   5 rides.
 - In January the last three complete months are October to December of the year before.
 - No rides at all gives an empty series and no headline, not an error.
+
+## Critical power
+
+The two-parameter model: the work done at each duration lies on a straight line,
+
+```
+work(t) = CP × t + W′          (work = mean watts × t)
+```
+
+**CP** is the slope, in watts: the power that could in principle be held indefinitely, and in
+practice close to an hour's best. **W′** is the intercept, in joules: the fixed store of work
+the rider can spend above CP before it runs out.
+
+**The window.** At the end of each month the model is fitted to the best power at 2, 5, 10 and
+20 minutes from the 90 days before it — the month's last day back to 89 days earlier. For the
+month in progress the window ends today. A best is the highest across every ride in the window;
+on a tie the earlier ride holds it.
+
+**Which rides.** Only rides whose FIT file is `parsed`. A ride the Garmin cross-check sent back
+to `pending` is out, exactly as it is out of the power records.
+
+**The fit.** Ordinary least squares of work on time over the durations present. At least three
+of the four are needed. A fit with CP or W′ at zero or below is refused: it means the bests do
+not fall away the way a maximal curve does, and is shown as a gap, never as a number.
+
+**Beside Garmin's FTP.** Each month carries Garmin's own FTP as it stood on the window's last
+day, from `ftp_at_ride`. The two are drawn together, ours as the main line and Garmin's in grey.
+They agree closely when the window holds hard efforts: 228 W against 237 W in October 2026.
+
+**What it cannot see.** The model only knows the efforts actually ridden. With no hard five-
+and twenty-minute effort in the window it reads low. That is why November 2023, a window of
+easy trainer rides, shows 110 W. There were no powered rides from 2024 to September 2025, so
+the series has a gap there.
+
+### What the critical power tests pin down
+
+- Bests built on a known CP and W′ give both back exactly.
+- Two durations are not enough, and give no fit.
+- A fit with no positive W′ is refused.
+- A ride 89 days before the window's end is in it; one 90 days before is not.
+- Garmin's FTP is the figure in force on or before the window's end, and absent before the
+  first one.
+- A month whose window holds too little is a gap, and the series still runs to today.
+- The ride count is of distinct rides, not of durations.
+- On a tie the earlier ride holds the best.
+- No efforts gives an empty series, not an error.
