@@ -1,3 +1,4 @@
+import type Database from 'better-sqlite3';
 import { db } from '../db/index.js';
 
 /**
@@ -268,10 +269,14 @@ export function bestPowerCurve(
 }
 
 /** Rides in the range that have a power curve on file but are left out of the records. */
-export function powerCurveHeldBack(sinceDate?: string, untilDate?: string): number {
+export function powerCurveHeldBack(
+  sinceDate?: string,
+  untilDate?: string,
+  database: Database.Database = db(),
+): number {
   const since = sinceDate ?? null;
   const until = untilDate ?? null;
-  const row = db()
+  const row = database
     .prepare(
       `SELECT COUNT(*) AS n
          FROM fit_file f

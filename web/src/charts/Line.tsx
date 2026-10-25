@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { useWidth } from './useWidth';
+import { linePath } from './linePath';
 
 export interface Series {
   name: string;
@@ -29,6 +30,12 @@ interface Props {
   tipLabels?: string[];
   /** How the hover tooltip prints a value. */
   format?: (value: number) => string;
+  /**
+   * Whether the scale reaches down to zero. On by default, so a load reads from nothing;
+   * off for a ratio such as efficiency, whose whole range sits far above zero and whose
+   * movement would flatten into a line against it.
+   */
+  includeZero?: boolean;
 }
 
 /** Round, even steps with the top tick above the maximum. */
@@ -59,6 +66,7 @@ export function LineChart({
   annotations = [],
   tipLabels,
   format = (v) => String(Math.round(v)),
+  includeZero = true,
 }: Props) {
   const clipId = useId();
   const [ref, width] = useWidth();
@@ -79,7 +87,7 @@ export function LineChart({
 
   const dataMin = Math.min(...all, reference ? reference.value : Infinity);
   const dataMax = Math.max(...all, reference ? reference.value : -Infinity);
-  const { lo, hi, ticks } = niceScale(Math.min(dataMin, 0), dataMax);
+  const { lo, hi, ticks } = niceScale(includeZero ? Math.min(dataMin, 0) : dataMin, dataMax);
   /* The heavy line is zero wherever zero is on the scale, not the lowest tick: a form
      chart that crosses zero reads from it, not from its floor. */
   const baseline = lo < 0 && hi > 0 ? 0 : lo;
@@ -101,17 +109,7 @@ export function LineChart({
 
   /** Straight segments, broken wherever the data is missing rather than interpolated. */
   function path(values: (number | null)[]): string {
-    let d = '';
-    let pen = false;
-    values.forEach((v, i) => {
-      if (v == null) {
-        pen = false;
-        return;
-      }
-      d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`;
-      pen = true;
-    });
-    return d;
+    return linePath(values.map((v, i) => (v == null ? null : { x: x(i), y: y(v) })));
   }
 
   function onMove(event: React.PointerEvent<SVGSVGElement>) {

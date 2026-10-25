@@ -251,6 +251,21 @@ Not deferred — ruled out, so nobody reopens them on the strength of the Swagge
 | Garmin's own PR flag | `isPR` true on **4 of 423** rides. |
 | Excluding rides from the power curve | `excludeFromPowerCurveReports` true on **0** rides. |
 
+#### Three projects, 25 October 2026
+
+Picked after looking at what intervals.icu, TrainingPeaks, Strava and VeloViewer offer, against
+what this data can support. Each has its own spec and plan under [`superpowers/`](superpowers/).
+
+1. **Performance. Built 25 October 2026.** Efficiency on road rides, critical power beside
+   Garmin's FTP, and ramp rate against the rider's own weeks, on a fourth screen. Trends now
+   covers load only. See [`performance.md`](performance.md).
+2. **Planning ahead.** Form projected forward to a chosen date. Next.
+3. **Motivation.** Records and yearly bests, the Eddington number (64 km today), a year in
+   review, goals.
+
+Heatmaps and explorer tiles were set aside: they need GPS tracks, which means a FIT download for
+every ride.
+
 #### Still unplanned, still candidates
 
 Export, backup, restore, delete. Always-on hosting, phone access, route and segment comparison,

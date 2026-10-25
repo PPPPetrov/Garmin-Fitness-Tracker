@@ -516,7 +516,7 @@ export function Overview() {
             title="Best power held"
             info="The highest average power held for each duration, from the original ride files. Only rides with a power meter count, so none of the mountain biking is in it."
             aside="All time"
-            foot={<More href="#trends">Power by season</More>}
+            foot={<More href="#performance">Power by season</More>}
           >
             {power.state === 'error' && <p className="state state-error">{power.message}</p>}
             {power.state === 'ready' && bests.length === 0 && (

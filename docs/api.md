@@ -248,9 +248,58 @@ The best power ever held at each duration, with the ride that set it.
 
 One row per duration, ascending. Durations with no data are absent rather than zero.
 
-Both bounds together are what make a season comparable with the one before it: the Trends
-screen asks for this year, then for last year stopped on today's day of the year. A peak
+Both bounds together are what make a season comparable with the one before it: the
+Performance screen asks for this year, then for last year stopped on today's day of the year. A peak
 held over ten months against one held over twelve is not a comparison.
+
+---
+
+## `GET /api/performance`
+
+Everything the Performance screen shows: efficiency on road rides, critical power beside
+Garmin's FTP, and ramp rate placed against the rider's own weeks. No parameters. Computed on
+each request; nothing is stored. The maths is in [`performance.md`](performance.md).
+
+```json
+{
+  "efficiency": {
+    "months": [ { "month": "2026-09", "median": 1.29, "rides": 13 } ],
+    "thisMonth": { "month": "2026-10", "median": 1.301, "rides": 3 },
+    "recent": 1.286, "before": 1.194, "change": 0.076,
+    "recentSpan": ["2026-07", "2026-09"], "beforeSpan": ["2026-04", "2026-06"],
+    "rides": 84
+  },
+  "criticalPower": {
+    "months": [ { "month": "2026-10", "cp": 228.1, "wPrimeJ": 21474, "rides": 34, "garminFtp": 237 } ],
+    "window": {
+      "from": "2026-07-28", "to": "2026-10-25",
+      "bests": [ { "durationS": 1200, "watts": 245.1, "date": "2026-09-15" } ]
+    }
+  },
+  "ramp": {
+    "date": "2026-10-22", "perWeek": -6.93, "percentile": 5, "percentAbove": 94,
+    "band": "lowest", "lastInBand": "2026-10-02", "estimated": true
+  },
+  "heldBack": 0,
+  "formula": { "efficiency": "…", "criticalPower": "…", "ramp": "…" }
+}
+```
+
+- `efficiency.months` holds complete months only, from the first qualifying ride, with empty
+  months present. `median` is `null` for a month with fewer than 3 rides. The month in
+  progress is `thisMonth`, never part of `months`.
+- `recent`, `before` and `change` are `null` unless both three-month spans hold at least 5
+  rides. `change` is a fraction: 0.076 is +7.6%.
+- `criticalPower.months` runs from the first month with a parsed power curve to the month in
+  progress, whose window ends today. `cp` and `wPrimeJ` are `null` when the window holds fewer
+  than three of the four durations, or the fit gives no positive W′. `garminFtp` is the FTP in
+  force on the window's last day, or `null` before the first.
+- `window.bests` holds at most four rows, one per duration in seconds (120, 300, 600, 1200).
+  A duration with no effort in the window is absent rather than zero.
+- `ramp` is `null` until the history is longer than the warm-up plus a week. `date` is the
+  latest day the load model holds, which is the last sync.
+- Rides held back by the Garmin cross-check are excluded from every figure and counted in
+  `heldBack`.
 
 ---
 
@@ -266,22 +315,6 @@ Newest year first. The cutoff is today's month and day, so a season in progress 
 against the same span of the ones before it rather than against their full twelve months.
 The first year of the history is short for the same honest reason: it begins on the day
 the account does.
-
----
-
-## `GET /api/ftp`
-
-The dated steps in Garmin's own threshold estimate.
-
-```json
-{ "steps": [ { "from": "2025-11-15", "watts": 189 }, { "from": "2026-01-25", "watts": 200 } ] }
-```
-
-Every powered ride carries the FTP in effect on its date, so no history table is needed:
-this reduces those rides to the days the figure changed. `from` is the first ride that
-carried the new value, which is the day it is known to have been in effect, not
-necessarily the day Garmin decided it. The estimate falls as well as rises — it drifts
-down when no hard effort is recorded — so a step down is not necessarily lost fitness.
 
 ---
 

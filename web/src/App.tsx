@@ -4,11 +4,13 @@ import { monthYear, num, stamp } from './format';
 import { DatabaseIcon, MenuIcon, SearchIcon, SyncIcon } from './ui';
 import { Activities } from './views/Activities';
 import { Overview } from './views/Overview';
+import { Performance } from './views/Performance';
 import { Trends } from './views/Trends';
 
 const VIEWS = [
   { id: 'overview', label: 'Overview' },
   { id: 'trends', label: 'Trends' },
+  { id: 'performance', label: 'Performance' },
   { id: 'activities', label: 'Activities' },
 ] as const;
 
@@ -64,6 +66,16 @@ function NavIcon({ id }: { id: ViewId }) {
       <svg {...common}>
         <path d="M1.75 11.5 5.5 7.25l3 2.5 5.75-6" />
         <path d="M10.75 3.75h3.5v3.5" />
+      </svg>
+    );
+  }
+  if (id === 'performance') {
+    /* A gauge: what the engine can do, as against the bike, which is the rides. */
+    return (
+      <svg {...common}>
+        <path d="M2.25 12.25a5.75 5.75 0 1 1 11.5 0" />
+        <path d="M8 12.25 10.75 7.5" />
+        <path d="M4.25 8.5l.75.5M8 4.5v.9M11.75 8.5l-.75.5" />
       </svg>
     );
   }
@@ -206,6 +218,7 @@ export function App() {
         <main className="page">
           {view === 'overview' && <Overview />}
           {view === 'trends' && <Trends />}
+          {view === 'performance' && <Performance />}
           {view === 'activities' && <Activities search={search} onSearch={setSearch} />}
         </main>
       </div>

@@ -83,7 +83,8 @@ Each answers one question, and the biggest block on it is the answer.
 | Screen | Question | Shape |
 | --- | --- | --- |
 | Overview | Am I fitter than I was, and how much fatigue am I carrying into today? | Four KPI cards; the fitness and fatigue chart beside the form gauge; the load calendar and the coverage ring beside the ten most recent rides; weekly hours beside best power |
-| Trends | How has the load moved over this period, and what are my best powers? | A range track in the title row; six KPI cards; training load beside the zones; form beside power by season; season and biggest-week tables; threshold power, ride types and untrusted rides |
+| Trends | How has the load moved over this period? | A range track in the title row; six KPI cards; training load beside the zones; form beside ride types stacked over untrusted rides; season and biggest-week tables |
+| Performance | Is my body getting stronger, not just busier? | Three KPI cards (critical power, efficiency, ramp rate); critical power beside Garmin's FTP, next to power by season; efficiency by month beside the efforts and rides these rest on. No range control |
 | Activities | Find the ride I am thinking of. | A type filter in the title row, one card holding the table, paging in its footer with the range stated |
 
 Under the title of each sits **the finding** — the one fact in today's data that most needs
@@ -92,6 +93,8 @@ attention, computed, not written.
 The search in the top bar finds rides by name or place, so it always answers on Activities:
 typing anywhere moves there and filters as you type. On a phone the top bar has no room for
 it and the field sits in the Activities title row instead, bound to the same value.
+
+On Performance the efficiency chart is the one line chart whose scale does not reach zero (): its values sit between about 1.1 and 1.3 watts per beat, and against zero that movement flattens into a line. Every load chart keeps zero, so it reads from nothing.
 
 ## Definitions live in the info mark
 
