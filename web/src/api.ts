@@ -261,6 +261,8 @@ export interface PlanningReport {
   turnsPositive: string | null;
   peak: { date: string; form: number; fitness: number };
   switchDay: { date: string; form: number; fitness: number };
+  /** The first day the 42-day window is clear of the last unmeasured ride; may be past the event. */
+  lessSureUntil: string | null;
   formula: string;
 }
 

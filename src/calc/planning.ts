@@ -19,6 +19,7 @@ import {
   addDays,
   computeLoadSeries,
   dailyInputs,
+  FITNESS_TIME_CONSTANT_DAYS,
   FORMULA_VERSION,
   today as todayLocal,
   type DayInput,
@@ -81,6 +82,12 @@ export interface Projection {
   turnsPositive: string | null;
   peak: { date: string; form: number; fitness: number };
   switchDay: { date: string; form: number; fitness: number };
+  /**
+   * The first day whose 42-day window is clear of the last unmeasured ride: the projection
+   * is less sure until then. It may fall after the event. Null when no projected day is
+   * less sure.
+   */
+  lessSureUntil: string | null;
 }
 
 function round(value: number): number {
@@ -248,6 +255,15 @@ export function project(
     if (row(date).form > peakRow.form) peakRow = row(date);
   }
 
+  /* The same boundary as `isEstimated` in computeLoadSeries: a day is less sure while the
+     window ending on it holds an unmeasured ride. */
+  let lastUnmeasured: string | null = null;
+  for (const [date, day] of perDay) {
+    if (day.unmeasured > 0 && (lastUnmeasured == null || date > lastUnmeasured)) lastUnmeasured = date;
+  }
+  const clearFrom = lastUnmeasured == null ? null : addDays(lastUnmeasured, FITNESS_TIME_CONSTANT_DAYS);
+  const lessSureUntil = clearFrom != null && clearFrom > today ? clearFrom : null;
+
   const onTheEve = (date: string) => {
     const day = row(date);
     return { date, form: round(day.form), fitness: row(addDays(date, -1)).fitness };
@@ -275,6 +291,7 @@ export function project(
     turnsPositive,
     peak: onTheEve(peakRow.date),
     switchDay: onTheEve(switchDate),
+    lessSureUntil,
   };
 }
 

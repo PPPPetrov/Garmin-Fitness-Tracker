@@ -379,6 +379,7 @@ rider tries things out.
   "turnsPositive": "2026-10-27",
   "peak": { "date": "2026-11-14", "form": 33.0, "fitness": 53.1 },
   "switchDay": { "date": "2026-11-01", "form": 20.4, "fitness": 63.0 },
+  "lessSureUntil": "2026-12-04",
   "formula": "…"
 }
 ```
@@ -389,6 +390,9 @@ rider tries things out.
   carries it and the default scenario is projected.
 - `series` holds 42 days of history, then today up to the event date. `projected` is true on
   days whose load is assumed rather than recorded.
+- `lessSureUntil` is the first day whose 42-day window is clear of the last ride with no
+  usable load, so the projection is less sure until then. It may fall after the event. It is
+  `null` when no projected day is less sure.
 - The body is `null` (status 200) when there is no history, or no complete day to start from.
 - Status codes: 200; 400 with `{ "error": "…" }`, one sentence naming the first wrong
   parameter, for a bad value or for some but not all four parameters.

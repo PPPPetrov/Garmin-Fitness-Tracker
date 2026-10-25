@@ -499,8 +499,12 @@ h1 {
   cursor: pointer;
 }
 
-.text-button:hover {
+.text-button:hover:not(:disabled) {
   color: var(--text);
+}
+
+.text-button:disabled {
+  cursor: progress;
 }
 
 .text-button:focus-visible {

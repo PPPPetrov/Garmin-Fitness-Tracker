@@ -35,32 +35,50 @@ const INFO = {
 /** The screen's question: where will I be on the day that matters? */
 export function Planning() {
   /* What `useApi` reads. It changes only when a control is changed (after the debounce) or
-     when the plan is cleared, so the first load asks for the saved plan or the default. */
-  const [path, setPath] = useState(planningPath(null));
-  const [reload, setReload] = useState(0);
-  const latest = useApi<PlanningReport | null>(path, [path, reload]);
+     when the plan is cleared, so the first load asks for the saved plan or the default.
+     `n` counts the requests issued, so the same path can be asked again and a response
+     can be told apart from one issued later. */
+  const [request, setRequest] = useState({ path: planningPath(null), n: 0 });
+  const latest = useApi<PlanningReport | null>(request.path, [request.path, request.n]);
+  /* Requests up to this number were issued before the last save landed: their reports
+     carry the plan as it was, so they must not replace the one the save returned. */
+  const staleUpTo = useRef(-1);
+  const issued = useRef(0);
+  const stale = request.n <= staleUpTo.current;
 
   /* The report on the page: the last one that arrived, or the one a save returned. It stays
      while the next one loads or when the next one is refused, so the skeletons show only on
      the first load. Undefined until the first report; null when there is no history. */
   const [shown, setShown] = useState<PlanningReport | null | undefined>(undefined);
   const [draft, setDraft] = useState<SavedPlan | null>(null);
+  const draftNow = useRef<SavedPlan | null>(null);
+  draftNow.current = draft;
   /* Set when the next report should replace the controls: the first load, and a clear. */
   const reseed = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /* A change waiting out the debounce, so the page does not yet show what the controls say. */
+  const [pending, setPending] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (latest.state !== 'ready') return;
+    if (latest.state !== 'ready' || stale) return;
     setShown(latest.data);
     if (reseed.current) {
       reseed.current = false;
       setDraft(latest.data ? draftFrom(latest.data) : null);
+      setClearing(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest]);
 
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  function ask(path: string) {
+    issued.current += 1;
+    setRequest({ path, n: issued.current });
+  }
 
   /** Change the controls, and re-project once they have been still for a moment. */
   function edit(change: Partial<SavedPlan>) {
@@ -69,15 +87,27 @@ export function Planning() {
     setDraft(next);
     setSaveError(null);
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setPath(planningPath(next)), DEBOUNCE_MS);
+    setPending(true);
+    timer.current = setTimeout(() => {
+      setPending(false);
+      ask(planningPath(next));
+    }, DEBOUNCE_MS);
   }
 
   async function save() {
     if (!draft) return;
+    const sent = draft;
+    clearTimeout(timer.current);
+    setPending(false);
     setSaving(true);
     setSaveError(null);
     try {
-      setShown(await savePlan({ ...draft, name: cleanName(draft.name) }));
+      const saved = await savePlan({ ...sent, name: cleanName(sent.name) });
+      staleUpTo.current = issued.current;
+      setShown(saved);
+      /* A control changed while the save was on its way: project what the controls say now. */
+      const now = draftNow.current;
+      if (now && now !== sent) ask(planningPath(now));
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -88,12 +118,14 @@ export function Planning() {
   async function clear() {
     setSaveError(null);
     clearTimeout(timer.current);
+    setPending(false);
+    setClearing(true);
     try {
       await clearPlan();
       reseed.current = true;
-      setPath(planningPath(null));
-      setReload((n) => n + 1);
+      ask(planningPath(null));
     } catch (error) {
+      setClearing(false);
       setSaveError(error instanceof Error ? error.message : String(error));
     }
   }
@@ -111,7 +143,7 @@ export function Planning() {
   const lessSure = eventRow?.estimated ? ' · less sure' : '';
   const name = cleanName(draft.name);
   const unsaved = isUnsaved(draft, report.plan);
-  const queryError = latest.state === 'error' ? latest.message : null;
+  const queryError = latest.state === 'error' && !stale ? latest.message : null;
 
   return (
     <>
@@ -226,13 +258,13 @@ export function Planning() {
                   className="btn-quiet"
                   type="button"
                   onClick={save}
-                  disabled={saving || queryError != null}
+                  disabled={saving || pending || latest.state !== 'ready' || queryError != null}
                 >
                   {saving ? 'Saving…' : 'Save'}
                 </button>
                 {unsaved && <span className="caption">Not saved</span>}
                 {report.plan && (
-                  <button className="text-button" type="button" onClick={clear}>
+                  <button className="text-button" type="button" onClick={clear} disabled={clearing}>
                     Clear plan
                   </button>
                 )}
@@ -295,7 +327,7 @@ export function Planning() {
                   figure={num(usual.unmeasured)}
                 />
               )}
-              <LessSure report={report} />
+              <LessSure until={report.lessSureUntil} />
               <Row name="Formula" sub="The same as the history" figure={report.formula} small />
             </div>
           </Card>
@@ -430,19 +462,14 @@ function Phase({
   );
 }
 
-/** Until when a projected day rests on a 42-day window with an unmeasured ride in it. */
-function LessSure({ report }: { report: PlanningReport }) {
-  const estimated = report.series.filter((d) => d.projected && d.estimated);
-  if (estimated.length === 0) return null;
-  const lastEstimated = estimated[estimated.length - 1]!.date;
-  /* The series ends at the event, so when the event day is still less sure the day it
-     clears lies beyond what the report carries. */
-  const throughEvent = lastEstimated === report.event.date;
+/** Until when the projection rests on a 42-day window with an unmeasured ride in it. */
+function LessSure({ until }: { until: string | null }) {
+  if (until == null) return null;
   return (
     <Row
-      name="Less sure"
+      name="Less sure until"
       sub="A ride with no usable load is in the 42-day window"
-      figure={throughEvent ? 'Past the event' : `Until ${shortDate(addDays(lastEstimated, 1))}`}
+      figure={shortDate(until)}
     />
   );
 }

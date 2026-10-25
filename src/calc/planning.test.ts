@@ -281,6 +281,29 @@ describe('project / estimated', () => {
   });
 });
 
+describe('project / lessSureUntil', () => {
+  const from = addDays(TODAY, -100);
+
+  it('is the first day the window is clear of the last unmeasured ride', () => {
+    const perDay = history(steady(from, addDays(TODAY, -1), 40));
+    perDay.set(addDays(TODAY, -2), { load: 10, rides: 1, unmeasured: 1 });
+    /* Past the event too: it is reported even when the event is still less sure. */
+    const projection = project(perDay, from, TODAY, scenario({ eventDate: addDays(TODAY, 10) }), []);
+    assert.equal(projection.lessSureUntil, addDays(TODAY, 40));
+  });
+
+  it('is null with no unmeasured ride', () => {
+    const perDay = history(steady(from, addDays(TODAY, -1), 40));
+    assert.equal(project(perDay, from, TODAY, scenario(), []).lessSureUntil, null);
+  });
+
+  it('is null when the window is clear by today', () => {
+    const perDay = history(steady(from, addDays(TODAY, -1), 40));
+    perDay.set(addDays(TODAY, -42), { load: 10, rides: 1, unmeasured: 1 });
+    assert.equal(project(perDay, from, TODAY, scenario(), []).lessSureUntil, null);
+  });
+});
+
 describe('scenarioError', () => {
   const bad = (overrides: Partial<Scenario>, name?: string) =>
     scenarioError(scenario(overrides), TODAY, name);
