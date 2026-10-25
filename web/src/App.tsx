@@ -69,6 +69,16 @@ function NavIcon({ id }: { id: ViewId }) {
       </svg>
     );
   }
+  if (id === 'performance') {
+    /* A gauge: what the engine can do, as against the bike, which is the rides. */
+    return (
+      <svg {...common}>
+        <path d="M2.25 12.25a5.75 5.75 0 1 1 11.5 0" />
+        <path d="M8 12.25 10.75 7.5" />
+        <path d="M4.25 8.5l.75.5M8 4.5v.9M11.75 8.5l-.75.5" />
+      </svg>
+    );
+  }
   return (
     <svg {...common}>
       <circle cx="4" cy="11.5" r="2.5" />
